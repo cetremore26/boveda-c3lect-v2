@@ -22,7 +22,12 @@
       "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\Usuario\\\\OneDrive\\\\Documents\\\\C3LECT\\\\boveda-c3lect-v2\\\\src\" -Force -Recurse -ErrorAction SilentlyContinue | Select-Object @{n='Path';e={$_.FullName -replace [regex]::Escape\\(\"c:\\\\Users\\\\Usuario\\\\OneDrive\\\\Documents\\\\C3LECT\\\\boveda-c3lect-v2\"\\), \".\"}} | Sort-Object Path | ForEach-Object { $_.Path })",
       "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\Usuario\\\\OneDrive\\\\Documents\\\\C3LECT\\\\boveda-c3lect-v2\\\\public\" -Force -Recurse -ErrorAction SilentlyContinue | Select-Object @{n='Path';e={$_.FullName -replace [regex]::Escape\\(\"c:\\\\Users\\\\Usuario\\\\OneDrive\\\\Documents\\\\C3LECT\\\\boveda-c3lect-v2\"\\), \".\"}} | Sort-Object Path | ForEach-Object { $_.Path })",
       "Bash(cd \"c:\\\\Users\\\\Usuario\\\\OneDrive\\\\Documents\\\\C3LECT\\\\boveda-c3lect-v2\" && rm -rf node_modules src/app/data/relojes.ts src/app/data/perfumes.ts src/app/data/accesorios.ts src/app/components/ui src/app/components/figma default_shadcn_theme.css src/styles/globals.css package-lock.json insertar_productos.sql && echo \"Borrado completo\")",
+<<<<<<< HEAD
       "PowerShell(Remove-Item -Recurse -Force \"c:\\\\Users\\\\Usuario\\\\OneDrive\\\\Documents\\\\C3LECT\\\\boveda-c3lect-v2\\\\node_modules\" -Confirm:$false)"
+=======
+      "Bash(pnpm install *)",
+      "Bash(pnpm build *)"
+>>>>>>> d00c6edf17acd411a22dd377cbb074fd0d82096d
     ],
     "additionalDirectories": [
       "c:\\Users\\Usuario\\OneDrive\\Documents\\C3LECT\\boveda-c3lect-v2\\node_modules"
