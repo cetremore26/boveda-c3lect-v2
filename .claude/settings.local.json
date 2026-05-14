@@ -11,7 +11,22 @@
       "PowerShell(cd \"c:\\\\Users\\\\Usuario\\\\OneDrive\\\\Documents\\\\C3LECT\\\\boveda-c3lect-v2\"; Get-ChildItem public -Force | ForEach-Object { $size = if \\($_.PSIsContainer\\) { \\(Get-ChildItem $_.FullName -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum\\).Sum } else { $_.Length }; [PSCustomObject]@{ Name = $_.Name; SizeMB = [math]::Round\\($size/1MB, 2\\) } } | Sort-Object SizeMB -Descending | Format-Table -AutoSize)",
       "Bash(git push *)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Usuario\\\\OneDrive\\\\Documents\\\\C3LECT\\\\boveda-c3lect-v2\" -Force -Recurse -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object FullName, Name, PSIsContainer)",
+      "Bash(Sort-Object FullName)",
+      "Bash(ConvertTo-Json -Depth 10)",
+      "Bash(Out-String)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\Usuario\\\\OneDrive\\\\Documents\\\\C3LECT\\\\boveda-c3lect-v2\" -Force -Recurse -ErrorAction SilentlyContinue | Select-Object @{n='Path';e={$_.FullName -replace [regex]::Escape\\(\"c:\\\\Users\\\\Usuario\\\\OneDrive\\\\Documents\\\\C3LECT\\\\boveda-c3lect-v2\"\\), \".\"}} | Sort-Object Path | ForEach-Object { $_.Path })",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\Usuario\\\\OneDrive\\\\Documents\\\\C3LECT\\\\boveda-c3lect-v2\" -Force -Exclude \".git\" | ForEach-Object { $_.Name })",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\Usuario\\\\OneDrive\\\\Documents\\\\C3LECT\\\\boveda-c3lect-v2\\\\src\" -Force -Recurse -ErrorAction SilentlyContinue | Select-Object @{n='Path';e={$_.FullName -replace [regex]::Escape\\(\"c:\\\\Users\\\\Usuario\\\\OneDrive\\\\Documents\\\\C3LECT\\\\boveda-c3lect-v2\"\\), \".\"}} | Sort-Object Path | ForEach-Object { $_.Path })",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\Usuario\\\\OneDrive\\\\Documents\\\\C3LECT\\\\boveda-c3lect-v2\\\\public\" -Force -Recurse -ErrorAction SilentlyContinue | Select-Object @{n='Path';e={$_.FullName -replace [regex]::Escape\\(\"c:\\\\Users\\\\Usuario\\\\OneDrive\\\\Documents\\\\C3LECT\\\\boveda-c3lect-v2\"\\), \".\"}} | Sort-Object Path | ForEach-Object { $_.Path })",
+      "Bash(cd \"c:\\\\Users\\\\Usuario\\\\OneDrive\\\\Documents\\\\C3LECT\\\\boveda-c3lect-v2\" && rm -rf node_modules src/app/data/relojes.ts src/app/data/perfumes.ts src/app/data/accesorios.ts src/app/components/ui src/app/components/figma default_shadcn_theme.css src/styles/globals.css package-lock.json insertar_productos.sql && echo \"Borrado completo\")",
+      "Bash(pnpm install *)",
+      "Bash(pnpm build *)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\Usuario\\OneDrive\\Documents\\C3LECT\\boveda-c3lect-v2\\node_modules"
     ]
   }
 }
