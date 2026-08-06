@@ -17,6 +17,9 @@ pnpm-debug.log*
 .vscode/
 .idea/
 
+# Herramientas locales
+.claude/
+
 # Sistema operativo
 .DS_Store
 Thumbs.db
