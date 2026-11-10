@@ -8,9 +8,17 @@ interface AuthContextValue {
   accessToken: string | null;
   cargando: boolean;
   autenticado: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  loginConOtp: (email: string, code: string) => Promise<{ requiresRegistration?: boolean }>;
-  register: (email: string, password: string, nombre: string, telefono?: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ challengeToken?: string }>;
+  completarSegundoFactor: (challengeToken: string, code: string) => Promise<void>;
+  loginConOtp: (email: string, code: string) => Promise<{ requiresRegistration?: boolean; registrationToken?: string }>;
+  register: (
+    email: string,
+    password: string,
+    nombre: string,
+    telefono?: string,
+    registrationToken?: string,
+  ) => Promise<void>;
+  restablecerContrasena: (token: string, newPassword: string) => Promise<void>;
   logout: () => Promise<void>;
   requestOtp: (email: string) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
@@ -67,6 +75,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function login(email: string, password: string) {
     const data = await authApi.login(email, password);
+    if ('accessToken' in data && data.accessToken) {
+      saveSession(data.accessToken, data.refreshToken, data.user);
+      setAccessToken(data.accessToken);
+      setUser(data.user);
+      return {};
+    }
+    if ('requiresSecondFactor' in data && data.requiresSecondFactor) {
+      return { challengeToken: data.challengeToken };
+    }
+    return {};
+  }
+
+  async function completarSegundoFactor(challengeToken: string, code: string) {
+    const data = await authApi.loginSegundoFactor(challengeToken, code);
     saveSession(data.accessToken, data.refreshToken, data.user);
     setAccessToken(data.accessToken);
     setUser(data.user);
@@ -79,11 +101,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAccessToken(data.accessToken);
       setUser(data.user);
     }
-    return { requiresRegistration: data.requiresRegistration };
+    return { requiresRegistration: data.requiresRegistration, registrationToken: data.registrationToken };
   }
 
-  async function register(email: string, password: string, nombre: string, telefono?: string) {
-    const data = await authApi.registrar({ email, password, nombre, telefono });
+  async function register(email: string, password: string, nombre: string, telefono?: string, registrationToken?: string) {
+    const data = await authApi.registrar({ email, password, nombre, telefono, registrationToken });
     saveSession(data.accessToken, data.refreshToken, data.user);
     setAccessToken(data.accessToken);
     setUser(data.user);
@@ -108,6 +130,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await authApi.solicitarRestablecimiento(email);
   }
 
+  async function restablecerContrasena(token: string, newPassword: string) {
+    await authApi.restablecerContrasena(token, newPassword);
+  }
+
   // Vuelve a leer /auth/me — se usa tras editar el perfil (nombre/teléfono)
   // para que el nombre en el nav y el resto de la app queden al día.
   async function refrescarUsuario() {
@@ -123,11 +149,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cargando,
       autenticado: !!user,
       login,
+      completarSegundoFactor,
       loginConOtp,
       register,
       logout,
       requestOtp,
       requestPasswordReset,
+      restablecerContrasena,
       refrescarUsuario,
     }}>
       {children}
