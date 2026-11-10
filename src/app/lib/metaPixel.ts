@@ -29,14 +29,17 @@ let initialized = false;
  * mete al propio dueño en las audiencias de retargeting, y le enseña al
  * algoritmo el perfil de un "cliente" que entra todos los días y nunca compra.
  *
+ * /reset-password se excluye por seguridad: el enlace del correo es una credencial
+ * de un solo uso y no debe llegar a terceros (ni en la URL ni en eventos).
+ *
  * admin.c3lect.com redirige a c3lect.com/admin, así que ese caso queda cubierto.
  * El PageView por cambio de ruta ya está a salvo por construcción: el hook vive
  * en Root.tsx (rama pública) y AdminRoot es una rama distinta del router. Esto
  * cubre el caso que faltaba: entrar directo a /admin desde el navegador.
  */
-function esRutaExcluida(): boolean {
-  if (typeof window === 'undefined') return false;
-  return window.location.pathname.startsWith('/admin');
+export function esRutaExcluida(pathname?: string): boolean {
+  const ruta = pathname ?? (typeof window === 'undefined' ? '' : window.location.pathname);
+  return ruta.startsWith('/admin') || ruta.startsWith('/reset-password');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -202,6 +205,7 @@ export function normalizePhoneCO(phone: string): string {
 /** PageView en cada cambio de ruta (obligatorio en una SPA — Meta no lo detecta solo). */
 export function trackPageView(): void {
   if (!initialized || !window.fbq) return;
+  if (esRutaExcluida()) return;
   // Por ruta: dos PageView de rutas distintas seguidos son legítimos; dos de
   // la misma ruta en menos de un segundo son un doble montaje.
   if (esRepetido(`PageView:${window.location.pathname}`, 1000)) return;
