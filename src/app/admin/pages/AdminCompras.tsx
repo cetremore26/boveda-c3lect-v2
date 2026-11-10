@@ -173,10 +173,12 @@ export default function AdminCompras() {
   }, []);
   const resumen = resumenQuery.data ?? null;
 
+  const refetchCompras = comprasQuery.refetch;
+  const refetchResumen = resumenQuery.refetch;
   useRefetchOnFocus(useCallback(() => {
-    comprasQuery.refetch();
-    resumenQuery.refetch();
-  }, [comprasQuery.refetch, resumenQuery.refetch]));
+    refetchCompras();
+    refetchResumen();
+  }, [refetchCompras, refetchResumen]));
 
   const marcasQuery = useApiQuery<string[]>(async (signal) => {
     return marcasApi.listar(signal);
@@ -186,7 +188,8 @@ export default function AdminCompras() {
   const inventarioQuery = useApiQuery<ItemInventario[]>(async (signal) => {
     return inventarioApi.listar(signal);
   }, []);
-  const inventarioItems = inventarioQuery.data ?? [];
+  const inventarioData = inventarioQuery.data;
+  const inventarioItems = useMemo(() => inventarioData ?? [], [inventarioData]);
 
   const errorOpciones = !!marcasQuery.error || !!inventarioQuery.error;
 

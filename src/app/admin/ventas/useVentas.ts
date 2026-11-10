@@ -67,7 +67,8 @@ export function useVentas() {
   // Volver a página 1 cuando cambian los filtros — igual criterio que en AdminCompras.
   useEffect(() => { setPage(1); }, [filtroEstado, filtroFuente, filtroCategoria, desde, hasta]);
 
-  useRefetchOnFocus(useCallback(() => ventasQuery.refetch(), [ventasQuery.refetch]));
+  const refetchVentas = ventasQuery.refetch;
+  useRefetchOnFocus(useCallback(() => refetchVentas(), [refetchVentas]));
 
   const inventarioQuery = useApiQuery<ItemInventario[]>(async (signal) => {
     return inventarioApi.listar(signal);

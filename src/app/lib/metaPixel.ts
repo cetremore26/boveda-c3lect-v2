@@ -10,7 +10,9 @@
 
 declare global {
   interface Window {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stub del snippet oficial de Meta Pixel
     fbq: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stub del snippet oficial de Meta Pixel
     _fbq: any;
   }
 }
@@ -90,10 +92,13 @@ export function initMetaPixel(): void {
   if (typeof window === 'undefined') return;
   if (esRutaExcluida()) return;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stub del snippet oficial de Meta Pixel
   (function (f: any, b: Document, e: string, v: string) {
     if (f.fbq) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stub del snippet oficial de Meta Pixel
     const n: any = (f.fbq = function (...args: any[]) {
-      n.callMethod ? n.callMethod.apply(n, args) : n.queue.push(args);
+      if (n.callMethod) n.callMethod(...args);
+      else n.queue.push(args);
     });
     if (!f._fbq) f._fbq = n;
     n.push = n;

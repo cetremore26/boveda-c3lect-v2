@@ -15,6 +15,42 @@ const COLUMNAS =
   "notas_descripcion, notas_top, notas_corazon, notas_base, " +
   "stock, descuento_invitado, descuento_cuenta, precio_final_invitado, precio_final_cuenta";
 
+// Fila de la vista `catalogo_publico`, tal como la devuelve Supabase.
+interface FilaCatalogo {
+  id: string;
+  nombre: string;
+  estilo: string;
+  display: string;
+  precio: number;
+  disponible: boolean;
+  destacado: boolean | null;
+  destacado_orden: number | null;
+  stock: number | null;
+  cat: Producto["cat"];
+  marca: string | null;
+  genero: Producto["genero"] | null;
+  imgs: string[];
+  spec_movimiento: string | null;
+  spec_dimensiones: string;
+  spec_caja: string;
+  spec_correa: string;
+  spec_cristal: string;
+  spec_funciones: string;
+  spec_resistencia_agua: string;
+  spec_peso: string;
+  spec_bateria: string;
+  spec_reserva_marcha: string;
+  spec_observaciones: string;
+  notas_descripcion: string | null;
+  notas_top: string;
+  notas_corazon: string;
+  notas_base: string;
+  descuento_invitado: number;
+  descuento_cuenta: number;
+  precio_final_invitado: number;
+  precio_final_cuenta: number;
+}
+
 export async function getProductos(): Promise<Producto[]> {
   const { data, error } = await supabase
     .from("catalogo_publico")
@@ -23,7 +59,7 @@ export async function getProductos(): Promise<Producto[]> {
 
   if (error) throw error;
 
-  return (data as any[]).map((p) => ({
+  return (data as unknown as FilaCatalogo[]).map((p) => ({
     id: p.id,
     nombre: p.nombre,
     estilo: p.estilo,

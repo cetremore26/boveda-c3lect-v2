@@ -107,7 +107,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       localStorage.setItem("c3lect-cart", JSON.stringify(state.items));
-    } catch {}
+    } catch {
+      // localStorage no disponible (modo privado o cuota llena): el carrito sigue en memoria.
+    }
   }, [state.items]);
 
   const totalItems = state.items.reduce((acc, i) => acc + i.cantidad, 0);
