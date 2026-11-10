@@ -7,12 +7,12 @@ export interface CartItem {
   cantidad: number;
 }
 
-interface CartState {
+export interface CartState {
   items: CartItem[];
   isOpen: boolean;
 }
 
-type CartAction =
+export type CartAction =
   | { type: "ADD"; producto: Producto }
   | { type: "REMOVE"; id: string }
   | { type: "UPDATE_QTY"; id: string; cantidad: number }
@@ -21,7 +21,7 @@ type CartAction =
   | { type: "CLOSE" }
   | { type: "TOGGLE" };
 
-function cartReducer(state: CartState, action: CartAction): CartState {
+export function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case "ADD": {
       const max = action.producto.stock;
