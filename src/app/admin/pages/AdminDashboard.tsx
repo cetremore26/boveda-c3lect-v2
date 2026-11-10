@@ -58,7 +58,8 @@ export default function AdminDashboard() {
           metricsApi.ventas({ estado: 'Pendiente,Abonado', limit: 200, page: 1 }, signal),
         ]);
         return { summary: s, financial: f, pendientes: p.data };
-      } catch (err: any) {
+      } catch (e) {
+        const err = e as { response?: { status?: number; data?: unknown }; message?: string } | null | undefined;
         console.error('[Dashboard] Error cargando métricas:', err?.response?.status, err?.response?.data ?? err?.message);
         throw new Error(`Error ${err?.response?.status ?? 'de red'}: No se pudo cargar el dashboard.`);
       }

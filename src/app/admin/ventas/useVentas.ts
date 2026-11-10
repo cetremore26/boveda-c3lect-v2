@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { mensajeDeError } from '../../api/common';
 import { inventarioApi, type ItemInventario } from '../../api/inventario';
 import { marcasApi } from '../../api/marcas';
 import { metricsApi, type VentasPaginadas } from '../../api/metrics';
@@ -111,8 +112,8 @@ export function useVentas() {
       setForm(EMPTY_FORM);
       setPage(1);
       ventasQuery.refetch();
-    } catch (err: any) {
-      setFormError(err?.response?.data?.message ?? 'Error al guardar la venta');
+    } catch (err) {
+      setFormError(mensajeDeError(err, 'Error al guardar la venta'));
     } finally { setGuardando(false); }
   };
 
@@ -131,8 +132,8 @@ export function useVentas() {
       await ventasApi.actualizar(editId, datosDesdeForm(editForm));
       setEditId(null);
       ventasQuery.refetch();
-    } catch (err: any) {
-      setEditError(err?.response?.data?.message ?? 'Error al guardar');
+    } catch (err) {
+      setEditError(mensajeDeError(err, 'Error al guardar'));
     } finally { setGuardando(false); }
   };
 

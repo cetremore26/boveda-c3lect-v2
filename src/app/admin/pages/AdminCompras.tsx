@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Pencil, Plus, X } from 'lucide-react';
 import { comprasApi, type Compra } from '../../api/compras';
-import type { Paginado } from '../../api/common';
+import { mensajeDeError, type Paginado } from '../../api/common';
 import { inventarioApi, type ItemInventario } from '../../api/inventario';
 import { marcasApi } from '../../api/marcas';
 import { metricsApi, type Financiero } from '../../api/metrics';
@@ -222,8 +222,8 @@ export default function AdminCompras() {
       setPage(1);
       comprasQuery.refetch();
       resumenQuery.refetch();
-    } catch (err: any) {
-      setFormError(err?.response?.data?.message ?? 'Error al guardar la compra');
+    } catch (err) {
+      setFormError(mensajeDeError(err, 'Error al guardar la compra'));
     } finally { setGuardando(false); }
   };
 
@@ -258,8 +258,8 @@ export default function AdminCompras() {
       setEditId(null);
       comprasQuery.refetch();
       resumenQuery.refetch();
-    } catch (err: any) {
-      setEditError(err?.response?.data?.message ?? 'Error al guardar');
+    } catch (err) {
+      setEditError(mensajeDeError(err, 'Error al guardar'));
     } finally { setGuardando(false); }
   };
 

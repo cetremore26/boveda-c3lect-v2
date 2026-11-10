@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
 import { gastosApi, type Gasto } from '../../api/gastos';
+import { mensajeDeError } from '../../api/common';
 import { formatPrecio as COP, formatFecha as fmtFecha } from '../../lib/format';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
@@ -43,8 +44,8 @@ export default function AdminGastos() {
       setShowForm(false);
       setForm(EMPTY_FORM);
       gastosQuery.refetch();
-    } catch (err: any) {
-      setFormError(err?.response?.data?.message ?? 'Error al guardar');
+    } catch (err) {
+      setFormError(mensajeDeError(err, 'Error al guardar'));
     } finally { setGuardando(false); }
   };
 
