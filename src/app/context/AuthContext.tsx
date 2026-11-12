@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { authApi, type UsuarioSesion } from '../api/auth';
-import { borrarSesionGuardada, escucharSesionCerrada } from '../lib/sesion';
+import { borrarSesionGuardada, debeCerrarSesionAlArrancar, escucharSesionCerrada } from '../lib/sesion';
 
 type AuthUser = UsuarioSesion;
 
@@ -54,8 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data);
         setAccessToken(storedToken);
       })
-      .catch(() => {
-        clearSession();
+      .catch((err) => {
+        if (debeCerrarSesionAlArrancar(err)) clearSession();
         setUser(null);
       })
       .finally(() => setCargando(false));

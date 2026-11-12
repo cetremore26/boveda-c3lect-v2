@@ -27,3 +27,9 @@ export function escucharSesionCerrada(handler: (motivo: MotivoCierre) => void): 
   window.addEventListener(EVENTO_SESION_CERRADA, listener);
   return () => window.removeEventListener(EVENTO_SESION_CERRADA, listener);
 }
+
+/** Al arrancar, solo un 401/403 indica sesión muerta; red, timeouts y 5xx (p. ej. arranque en frío) no. */
+export function debeCerrarSesionAlArrancar(err: unknown): boolean {
+  const status = (err as { response?: { status?: number } } | null | undefined)?.response?.status;
+  return status === 401 || status === 403;
+}
