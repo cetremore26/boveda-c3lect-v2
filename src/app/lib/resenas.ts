@@ -38,3 +38,23 @@ export const LIMITES_RESENA = {
   comentarioMax: 1000,
   respuestaMax: 1000,
 } as const;
+
+export type AccionResenar = "esperar" | "abrir" | "descartar";
+
+/**
+ * Qué hacer con ?resenar=1. Hay que esperar a que la sesión y los pendientes
+ * (consultados con esa misma sesión) estén resueltos; si no, el parámetro se
+ * borraría antes de saber si el cliente puede reseñar.
+ */
+export function accionResenar(e: {
+  authCargando: boolean;
+  autenticado: boolean;
+  pendientesCargando: boolean;
+  consultadoConSesion: boolean | null;
+  puedeResenar: boolean;
+}): AccionResenar {
+  if (e.authCargando || e.pendientesCargando || e.consultadoConSesion !== e.autenticado) {
+    return "esperar";
+  }
+  return e.puedeResenar ? "abrir" : "descartar";
+}
