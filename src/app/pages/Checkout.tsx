@@ -74,7 +74,7 @@ export default function Checkout() {
     setError('');
     setEnviando(true);
     try {
-      const result = await submitCheckout({ items, totalPrice, metodoPago, form });
+      const result = await submitCheckout({ items, totalPrice, metodoPago, form, idempotencyKey: crypto.randomUUID() });
       clearCart();
       if (result.kind === 'contraentrega') {
         setPedidoConfirmado(result.order);

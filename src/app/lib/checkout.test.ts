@@ -9,7 +9,12 @@ vi.mock('./metaPixel', () => ({
   getFbCookies: vi.fn(() => ({ fbp: 'fb.1', fbc: 'fc.1' })),
 }));
 
-import { submitCheckout, type ShippingForm } from './checkout';
+import {
+  submitCheckout,
+  esUrlDeMercadoPago,
+  CheckoutUrlInvalidaError,
+  type ShippingForm,
+} from './checkout';
 import { ordersApi } from '../api/orders';
 import { paymentsApi } from '../api/payments';
 import { trackInitiateCheckout, trackPurchase, setMetaUserData } from './metaPixel';
@@ -35,16 +40,41 @@ const itemsPayload = [
   { productId: 'p2', cantidad: 1 },
 ];
 
+const MP_URL = 'https://www.mercadopago.com.co/checkout/v1/redirect?pref_id=1';
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
+describe('esUrlDeMercadoPago', () => {
+  it.each([
+    'https://www.mercadopago.com.co/checkout/v1/redirect?pref_id=1',
+    'https://sandbox.mercadopago.com.co/checkout/v1/redirect?pref_id=1',
+    'https://www.mercadopago.com/checkout/v1/redirect?pref_id=1',
+  ])('acepta %s', (u) => expect(esUrlDeMercadoPago(u)).toBe(true));
+
+  it.each([
+    '',
+    'no es url',
+    'http://www.mercadopago.com.co/x',
+    'https://mercadopago.com.co.evil.com/x',
+    'https://evilmercadopago.com/x',
+    'javascript:alert(1)',
+  ])('rechaza %j', (u) => expect(esUrlDeMercadoPago(u)).toBe(false));
+});
+
 describe('submitCheckout CONTRAENTREGA', () => {
   it('crea el pedido, registra Purchase y no crea pago pendiente', async () => {
-    const order = { id: 'o1', orderNumber: 'C3-001' };
-    vi.mocked(ordersApi.crear).mockResolvedValue(order as never);
+    const order = { id: 'o1', orderNumber: 'C3-001', subtotal: 260000, total: 260000 };
+    vi.mocked(ordersApi.crear).mockResolvedValue(order);
 
-    const r = await submitCheckout({ items, totalPrice: 250000, metodoPago: 'CONTRAENTREGA', form });
+    const r = await submitCheckout({
+      items,
+      totalPrice: 250000,
+      metodoPago: 'CONTRAENTREGA',
+      form,
+      idempotencyKey: 'k-1',
+    });
 
     expect(ordersApi.crear).toHaveBeenCalledWith({
       metodoPago: 'CONTRAENTREGA',
@@ -52,17 +82,19 @@ describe('submitCheckout CONTRAENTREGA', () => {
       shippingInfo: form,
       fbp: 'fb.1',
       fbc: 'fc.1',
+      idempotencyKey: 'k-1',
     });
     expect(r).toEqual({ kind: 'contraentrega', order });
     expect(trackPurchase).toHaveBeenCalledTimes(1);
-    expect(trackPurchase).toHaveBeenCalledWith({ orderNumber: 'C3-001', items, total: 250000 });
+    // El Purchase usa el total del backend, no el del carrito.
+    expect(trackPurchase).toHaveBeenCalledWith({ orderNumber: 'C3-001', items, total: 260000 });
     expect(paymentsApi.crearPendiente).not.toHaveBeenCalled();
   });
 
   it('si crear rechaza, rechaza y no registra Purchase', async () => {
     vi.mocked(ordersApi.crear).mockRejectedValue(new Error('boom'));
     await expect(
-      submitCheckout({ items, totalPrice: 250000, metodoPago: 'CONTRAENTREGA', form }),
+      submitCheckout({ items, totalPrice: 250000, metodoPago: 'CONTRAENTREGA', form, idempotencyKey: 'k' }),
     ).rejects.toThrow('boom');
     expect(trackPurchase).not.toHaveBeenCalled();
   });
@@ -70,9 +102,9 @@ describe('submitCheckout CONTRAENTREGA', () => {
 
 describe('submitCheckout MERCADOPAGO', () => {
   it('crea pago pendiente y devuelve checkoutUrl sin Purchase ni pedido', async () => {
-    vi.mocked(paymentsApi.crearPendiente).mockResolvedValue({ checkoutUrl: 'https://mp/x' } as never);
+    vi.mocked(paymentsApi.crearPendiente).mockResolvedValue({ checkoutUrl: MP_URL });
 
-    const r = await submitCheckout({ items, totalPrice: 250000, metodoPago: 'MERCADOPAGO', form });
+    const r = await submitCheckout({ items, totalPrice: 250000, metodoPago: 'MERCADOPAGO', form, idempotencyKey: 'k' });
 
     expect(paymentsApi.crearPendiente).toHaveBeenCalledWith({
       items: itemsPayload,
@@ -80,24 +112,32 @@ describe('submitCheckout MERCADOPAGO', () => {
       fbp: 'fb.1',
       fbc: 'fc.1',
     });
-    expect(r).toEqual({ kind: 'mercadopago', checkoutUrl: 'https://mp/x' });
+    expect(r).toEqual({ kind: 'mercadopago', checkoutUrl: MP_URL });
     expect(trackPurchase).not.toHaveBeenCalled();
     expect(ordersApi.crear).not.toHaveBeenCalled();
+    expect(vi.mocked(paymentsApi.crearPendiente).mock.calls[0][0]).not.toHaveProperty('idempotencyKey');
+  });
+
+  it.each(['', 'https://evil.com/x'])('checkoutUrl %j lanza CheckoutUrlInvalidaError', async (checkoutUrl) => {
+    vi.mocked(paymentsApi.crearPendiente).mockResolvedValue({ checkoutUrl });
+    await expect(
+      submitCheckout({ items, totalPrice: 1, metodoPago: 'MERCADOPAGO', form, idempotencyKey: 'k' }),
+    ).rejects.toBeInstanceOf(CheckoutUrlInvalidaError);
   });
 });
 
 describe('submitCheckout tracking común', () => {
   beforeEach(() => {
-    vi.mocked(paymentsApi.crearPendiente).mockResolvedValue({ checkoutUrl: 'u' } as never);
+    vi.mocked(paymentsApi.crearPendiente).mockResolvedValue({ checkoutUrl: MP_URL });
   });
 
   it('trackInitiateCheckout con items y total', async () => {
-    await submitCheckout({ items, totalPrice: 250000, metodoPago: 'MERCADOPAGO', form });
+    await submitCheckout({ items, totalPrice: 250000, metodoPago: 'MERCADOPAGO', form, idempotencyKey: 'k' });
     expect(trackInitiateCheckout).toHaveBeenCalledWith(items, 250000);
   });
 
   it('separa firstName y lastName', async () => {
-    await submitCheckout({ items, totalPrice: 1, metodoPago: 'MERCADOPAGO', form });
+    await submitCheckout({ items, totalPrice: 1, metodoPago: 'MERCADOPAGO', form, idempotencyKey: 'k' });
     expect(setMetaUserData).toHaveBeenCalledWith(
       expect.objectContaining({ firstName: 'Ana', lastName: 'María Pérez' }),
     );
@@ -109,6 +149,7 @@ describe('submitCheckout tracking común', () => {
       totalPrice: 1,
       metodoPago: 'MERCADOPAGO',
       form: { ...form, nombreCompleto: 'Ana' },
+      idempotencyKey: 'k',
     });
     expect(setMetaUserData).toHaveBeenCalledWith(
       expect.objectContaining({ firstName: 'Ana', lastName: undefined }),

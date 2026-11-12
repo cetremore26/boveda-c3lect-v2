@@ -1,5 +1,5 @@
 import type { CartItem } from '../context/CartContext';
-import { ordersApi, type MetodoPago } from '../api/orders';
+import { ordersApi, type MetodoPago, type PedidoCreado } from '../api/orders';
 import { paymentsApi } from '../api/payments';
 import {
   trackInitiateCheckout,
@@ -20,9 +20,27 @@ export interface ShippingForm {
   notas: string;
 }
 
-export interface OrderResponse {
-  id: string;
-  orderNumber: string;
+export type OrderResponse = PedidoCreado;
+
+export const DOMINIOS_MERCADOPAGO = ['mercadopago.com.co', 'mercadopago.com'] as const;
+
+export function esUrlDeMercadoPago(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== 'https:') return false;
+    return DOMINIOS_MERCADOPAGO.some(
+      (d) => u.hostname === d || u.hostname.endsWith('.' + d),
+    );
+  } catch {
+    return false;
+  }
+}
+
+export class CheckoutUrlInvalidaError extends Error {
+  constructor() {
+    super('No pudimos abrir MercadoPago. Intenta de nuevo en un momento.');
+    this.name = 'CheckoutUrlInvalidaError';
+  }
 }
 
 export type CheckoutResult =
@@ -38,8 +56,9 @@ export async function submitCheckout(params: {
   totalPrice: number;
   metodoPago: MetodoPago;
   form: ShippingForm;
+  idempotencyKey: string;
 }): Promise<CheckoutResult> {
-  const { items, totalPrice, metodoPago, form } = params;
+  const { items, totalPrice, metodoPago, form, idempotencyKey } = params;
   const itemsPayload = items.map((i) => ({ productId: i.producto.id, cantidad: i.cantidad }));
 
   // Ya tenemos los datos del cliente: se los pasamos a Meta (el navegador
@@ -68,12 +87,13 @@ export async function submitCheckout(params: {
       shippingInfo: form,
       fbp: fb.fbp,
       fbc: fb.fbc,
+      idempotencyKey,
     });
 
     // El Purchase de contraentrega va AQUÍ: esta rama nunca navega a
     // /checkout/success — el caller muestra la confirmación en la misma
     // página, así que este es el único momento en que hay items/total que enviar.
-    trackPurchase({ orderNumber: order.orderNumber, items, total: totalPrice });
+    trackPurchase({ orderNumber: order.orderNumber, items, total: order.total });
 
     return { kind: 'contraentrega', order };
   }
@@ -91,6 +111,8 @@ export async function submitCheckout(params: {
     fbp: fb.fbp,
     fbc: fb.fbc,
   });
+
+  if (!esUrlDeMercadoPago(pago.checkoutUrl)) throw new CheckoutUrlInvalidaError();
 
   return { kind: 'mercadopago', checkoutUrl: pago.checkoutUrl };
 }
