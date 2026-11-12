@@ -7,13 +7,16 @@ import { ESTADOS, FUENTES, recalcEstado, type FormState } from './venta-form';
 // Estilos definidos a nivel de módulo para que VentaForm no los pierda en cada render
 const inp = 'bg-[#0A0A0A] border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C9A84C]/60 w-full';
 const sel = inp + ' cursor-pointer';
+const TITULO_BLOQUEADO = 'No se puede cambiar la marca ni el modelo de una venta: bórrala y créala de nuevo.';
 
-export function VentaForm({ title, f, setF, onSubmit, onCancel, error, saving, submitLabel, marcas, inventario, precios, productos, errorOpciones }: {
+export function VentaForm({ title, f, setF, onSubmit, onCancel, error, saving, submitLabel, marcas, inventario, precios, productos, errorOpciones, edicion }: {
   title: string; f: FormState; setF: (fn: (prev: FormState) => FormState) => void;
   onSubmit: (e: React.FormEvent) => void; onCancel: () => void;
   error: string; saving: boolean; submitLabel: string;
   marcas?: string[]; inventario?: ItemInventario[]; precios?: Precio[]; productos?: ProductoAdmin[];
   errorOpciones?: boolean;
+  // Al editar, el backend no deja cambiar marca ni modelo.
+  edicion?: boolean;
 }) {
   const disponibles = inventario?.filter(i => i.stock > 0) ?? [];
   const marcasDisponibles = marcas ?? [];
@@ -92,7 +95,10 @@ export function VentaForm({ title, f, setF, onSubmit, onCancel, error, saving, s
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
         <div>
           <label className="text-xs text-white/40 mb-1 block">Marca *</label>
-          {modoMarcaNueva ? (
+          {edicion ? (
+            <input type="text" disabled value={f.marca} title={TITULO_BLOQUEADO}
+              className={inp + ' opacity-50 cursor-not-allowed'} />
+          ) : modoMarcaNueva ? (
             <div className="flex gap-2">
               <input type="text" required placeholder="Naviforce..." value={f.marca} onChange={e => setF(p => ({ ...p, marca: e.target.value }))} className={inp} />
               {marcasDisponibles.length > 0 && (
@@ -111,7 +117,10 @@ export function VentaForm({ title, f, setF, onSubmit, onCancel, error, saving, s
         </div>
         <div>
           <label className="text-xs text-white/40 mb-1 block">Modelo *</label>
-          {!modoModeloNuevo && modeloOpciones.length > 0 ? (
+          {edicion ? (
+            <input type="text" disabled value={f.modelo} title={TITULO_BLOQUEADO}
+              className={inp + ' opacity-50 cursor-not-allowed'} />
+          ) : !modoModeloNuevo && modeloOpciones.length > 0 ? (
             <select required value={f.modelo} onChange={e => handleModeloSelectChange(e.target.value)} className={sel}>
               <option value="">Seleccionar producto…</option>
               {modeloOpciones.map(o => (

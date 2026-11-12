@@ -37,6 +37,7 @@ export function useVentas() {
   const [editForm, setEditForm] = useState<FormState>(formVacio);
   const [editError, setEditError] = useState('');
   const [eliminando, setEliminando] = useState<string | null>(null);
+  const [errorEliminar, setErrorEliminar] = useState('');
 
   const ventasQuery = useApiQuery<VentasPaginadas>(
     async (signal) => {
@@ -141,9 +142,12 @@ export function useVentas() {
   const handleDelete = async (id: string) => {
     if (!confirm('¿Eliminar esta venta? Se revertirá el descuento de inventario.')) return;
     setEliminando(id);
+    setErrorEliminar('');
     try {
       await ventasApi.eliminar(id);
       ventasQuery.refetch();
+    } catch (err) {
+      setErrorEliminar(mensajeDeError(err, 'No se pudo eliminar la venta'));
     } finally { setEliminando(null); }
   };
 
@@ -155,6 +159,6 @@ export function useVentas() {
     showForm, setShowForm, form, setForm, formError, handleSubmit,
     editId, setEditId, editForm, setEditForm, editError, setEditError,
     handleEdit, handleEditSave,
-    guardando, exportando, handleExport, eliminando, handleDelete,
+    guardando, exportando, handleExport, eliminando, handleDelete, errorEliminar,
   };
 }

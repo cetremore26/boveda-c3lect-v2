@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { recalcEstado, datosDesdeForm, formVacio } from './venta-form';
+import { recalcEstado, datosDesdeForm, formVacio, puedeEliminarVenta } from './venta-form';
 
 const base = { ...formVacio(), precioVenta: '100000' };
 
@@ -49,5 +49,15 @@ describe('formVacio', () => {
     vi.setSystemTime(new Date(2026, 10, 5, 21));
     expect(formVacio().fecha).toBe('2026-11-05');
     vi.useRealTimers();
+  });
+});
+
+describe('puedeEliminarVenta', () => {
+  it('permite borrar una venta manual', () => {
+    expect(puedeEliminarVenta({ orderId: null })).toBe(true);
+    expect(puedeEliminarVenta({})).toBe(true);
+  });
+  it('no permite borrar una venta que viene de un pedido', () => {
+    expect(puedeEliminarVenta({ orderId: 'ord-1' })).toBe(false);
   });
 });

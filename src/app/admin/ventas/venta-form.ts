@@ -89,3 +89,11 @@ export function formDesdeVenta(v: Venta): FormState {
     estado: v.estado,
   };
 }
+
+export const MENSAJE_VENTA_DE_PEDIDO =
+  'Esta venta viene de un pedido de la plataforma: cancela el pedido en su lugar.';
+
+// El backend rechaza borrar ventas que vienen de un pedido.
+export function puedeEliminarVenta(v: Pick<Venta, 'orderId'>): boolean {
+  return !v.orderId;
+}
