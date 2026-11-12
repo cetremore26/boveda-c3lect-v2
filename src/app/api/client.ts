@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { rutaDeAcceso } from '../lib/volver';
+import { borrarSesionGuardada, emitirSesionCerrada, esRutaProtegida } from '../lib/sesion';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -8,6 +9,21 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+const RUTAS_DE_AUTH = [
+  '/auth/login',
+  '/auth/refresh',
+  '/auth/register',
+  '/auth/verify-otp',
+  '/auth/request-otp',
+  '/auth/reset-password',
+  '/auth/request-password-reset',
+];
+
+/** Un 401 de estos endpoints es una respuesta normal, no una sesión caducada. */
+export function esEndpointDeAuth(url: string): boolean {
+  return RUTAS_DE_AUTH.some((ruta) => url.includes(ruta));
+}
+
 api.interceptors.request.use((config) => {
   const token = sessionStorage.getItem('accessToken');
   if (token) config.headers.Authorization = `Bearer ${token}`;
@@ -15,10 +31,9 @@ api.interceptors.request.use((config) => {
 });
 
 function clearSessionAndRedirect() {
-  sessionStorage.removeItem('accessToken');
-  sessionStorage.removeItem('refreshToken');
-  sessionStorage.removeItem('authUser');
-  if (window.location.pathname !== '/login') {
+  borrarSesionGuardada();
+  emitirSesionCerrada('expirada');
+  if (esRutaProtegida(window.location.pathname)) {
     window.location.href = rutaDeAcceso(window.location.pathname + window.location.search);
   }
 }
@@ -51,9 +66,8 @@ api.interceptors.response.use(
     const originalRequest = error.config;
     const status = error.response?.status;
     const url: string = originalRequest?.url ?? '';
-    const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/refresh') || url.includes('/auth/register');
 
-    if (status !== 401 || isAuthEndpoint || !originalRequest || originalRequest._retried) {
+    if (status !== 401 || esEndpointDeAuth(url) || !originalRequest || originalRequest._retried) {
       return Promise.reject(error);
     }
     originalRequest._retried = true;

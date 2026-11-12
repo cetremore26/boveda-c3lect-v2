@@ -16,6 +16,8 @@ export interface Venta {
   gananciaNeta: number | null;
   fuente: string | null;
   estado: string;
+  // Presente cuando la venta nació de un pedido de la plataforma.
+  orderId?: string | null;
 }
 
 export interface DatosVenta {

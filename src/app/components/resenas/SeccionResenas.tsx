@@ -5,7 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import { rutaDeAcceso } from "../../lib/volver";
 import { usePendientesDeResena } from "../../hooks/useResenas";
 import type { ResenaPublica } from "../../data/resenas";
-import type { ResumenResenas as Resumen } from "../../lib/resenas";
+import { accionResenar, type ResumenResenas as Resumen } from "../../lib/resenas";
 import { AvisoError } from "../AvisoError";
 import { Button } from "../ds/Button";
 import { ResumenResenas } from "./ResumenResenas";
@@ -36,7 +36,7 @@ export function SeccionResenas({
   error: Error | null;
   recargar: () => void;
 }) {
-  const { autenticado } = useAuth();
+  const { autenticado, cargando: authCargando } = useAuth();
   const pendientes = usePendientesDeResena(autenticado);
   const puedeResenar = pendientes.ids.has(productId);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -48,12 +48,22 @@ export function SeccionResenas({
   // Desde "Mis pedidos" se llega con ?resenar=1: abre el formulario y baja
   // hasta él en cuanto se sabe que el cliente puede reseñar.
   const pidioResenar = searchParams.get("resenar") === "1";
+  const pendientesCargando = pendientes.loading;
+  const consultadoConSesion = pendientes.consultadoConSesion;
   useEffect(() => {
-    if (!pidioResenar || pendientes.loading) return;
-    if (puedeResenar) setFormAbierto(true);
+    if (!pidioResenar) return;
+    const accion = accionResenar({
+      authCargando,
+      autenticado,
+      pendientesCargando,
+      consultadoConSesion,
+      puedeResenar,
+    });
+    if (accion === "esperar") return;
+    if (accion === "abrir") setFormAbierto(true);
     ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     setSearchParams((p) => { p.delete("resenar"); return p; }, { replace: true });
-  }, [pidioResenar, pendientes.loading, puedeResenar, setSearchParams]);
+  }, [pidioResenar, authCargando, autenticado, pendientesCargando, consultadoConSesion, puedeResenar, setSearchParams]);
 
   function handlePublicada() {
     setFormAbierto(false);

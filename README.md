@@ -2,7 +2,7 @@
 
 Catálogo digital de relojería y perfumería de alta gama. Es la tienda en línea de **C3LECT** — Medellín, Colombia.
 
-🔗 **[Ver en vivo](https://c3lect.com/)** · 🔐 **[API que la alimenta](https://github.com/cetremore26/c3lect-api)** · 📘 **[Docs de la API](https://c3lect-api.onrender.com/api/docs)**
+🔗 **[Ver en vivo](https://c3lect.com/)** · 🔐 **[API que la alimenta](https://github.com/cetremore26/c3lect-api)** (su documentación Swagger solo se expone fuera de producción)
 
 ![Bóveda C3LECT — vista de escritorio](docs/screenshots/desktop.png)
 
@@ -34,8 +34,13 @@ El catálogo se divide en dos líneas: **Máquinas y Joyas** (relojería) y **Fi
 - Stock en vivo desde la base de datos — el carrito no permite pedir más de lo disponible
 - Checkout para invitados y para usuarios registrados
 - Pago en línea vía MercadoPago
+- **Reseñas de productos:** la lectura es pública, desde la vista `resenas_publicas` de Supabase; escribirlas y moderarlas pasa por la API
+- **Cuenta del cliente** (`/cuenta`): perfil, direcciones y "Mis pedidos"
+- **Registro con código:** email → código de 6 dígitos por correo → formulario de cuenta; nadie crea una cuenta sin verificar su correo
+- **2FA del admin:** tras la contraseña, el admin ingresa el código enviado a su correo
+- **Recuperación de contraseña:** el enlace del correo lleva el token en el fragmento (`#token=…`), con pantalla de nueva contraseña; en esa ruta no se carga el Pixel de Meta
+- **Panel admin** (`/admin`): productos (con orden de destacados), pedidos, clientes, ventas, compras, gastos, inventario, precios, promociones, reseñas, auditoría y panel de métricas con gráficas (Recharts)
 - Interfaz responsive con animaciones de Motion
-- Panel de métricas con gráficas (Recharts)
 
 ---
 
@@ -74,6 +79,8 @@ La tienda lee el catálogo directo de la vista `catalogo_publico` de Supabase, a
 
 Todo lo demás pasa por `src/app/api/`: un archivo por módulo del backend, y el único lugar que habla con la API. `scripts/check-architecture.mjs` (corre en `pnpm typecheck`) hace cumplir esa regla.
 
+**Carrito y checkout.** El carrito guarda solo `{ id, cantidad }`; el stock, el precio y la disponibilidad se resuelven siempre contra el catálogo. El checkout no vacía el carrito antes de redirigir a MercadoPago: guarda un `pendingCheckout` y el carrito se vacía en `/checkout/success`, cuando el pago se aprobó. Un pago rechazado o abandonado no pierde el carrito.
+
 ---
 
 ## Puesta en marcha
@@ -83,6 +90,9 @@ pnpm install
 cp .env.example .env    # completa las credenciales
 pnpm dev                # http://localhost:5173
 pnpm build               # build de producción
+pnpm test                # Vitest
+pnpm lint                # ESLint
+pnpm typecheck           # tsc + reglas de arquitectura (scripts/check-architecture.mjs)
 ```
 
 ### Variables de entorno
@@ -103,6 +113,8 @@ pnpm build               # build de producción
 | Frontend | Cloudflare Pages · [c3lect.com](https://c3lect.com/) | Cada push a `main` se compila con pnpm y se publica solo |
 | API | Render | Cada push a `main` del repo de la API se publica solo |
 | Base de datos | Supabase (PostgreSQL) | Migraciones con Prisma desde el repo de la API |
+
+**Orden de despliegue: primero el frontend, luego la API.** El front nuevo es compatible con la API vieja, pero la API nueva no lo es con el front viejo (por ejemplo, exige `registrationToken` para registrar y responde `requiresSecondFactor` al admin). Los pasos completos de la API están en su README.
 
 Las cabeceras de seguridad (CSP, X-Frame-Options…) están en `public/_headers` y las reglas de la SPA en `public/_redirects`.
 

@@ -22,7 +22,20 @@ export interface ResenaPublica {
 const COLUMNAS =
   "id, product_id, producto_nombre, autor_nombre, calificacion, titulo, comentario, respuesta, respondida_at, created_at";
 
-function mapear(r: any): ResenaPublica {
+interface FilaResena {
+  id: string;
+  product_id: string;
+  producto_nombre: string;
+  autor_nombre: string;
+  calificacion: number;
+  titulo: string | null;
+  comentario: string;
+  respuesta: string | null;
+  respondida_at: string | null;
+  created_at: string;
+}
+
+function mapear(r: FilaResena): ResenaPublica {
   return {
     id: r.id,
     productId: r.product_id,

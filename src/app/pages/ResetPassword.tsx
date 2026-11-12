@@ -1,11 +1,21 @@
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { Field } from '../components/ds/Field';
 import { Button } from '../components/ds/Button';
+import { FormError } from '../components/ds/FormError';
+import { mensajeDeError } from '../api/common';
+import { tokenDeResetCapturado } from '../lib/resetToken';
+import { validarNuevaContrasena } from '../lib/contrasena';
 
 export default function ResetPassword() {
-  const { requestPasswordReset } = useAuth();
+  const { requestPasswordReset, restablecerContrasena } = useAuth();
+  const navigate = useNavigate();
+  const token = tokenDeResetCapturado();
+
+  const [nueva, setNueva] = useState('');
+  const [confirmacion, setConfirmacion] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const [email, setEmail] = useState('');
   const [enviado, setEnviado] = useState(false);
@@ -13,12 +23,34 @@ export default function ResetPassword() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
     setEnviando(true);
     try {
       await requestPasswordReset(email);
+      setEnviado(true);
+    } catch (err) {
+      setError(mensajeDeError(err, 'No pudimos enviar el enlace. Intenta de nuevo.'));
     } finally {
       setEnviando(false);
-      setEnviado(true);
+    }
+  }
+
+  async function handleNuevaContrasena(e: React.FormEvent) {
+    e.preventDefault();
+    if (!token) return;
+    const invalida = validarNuevaContrasena(nueva, confirmacion);
+    if (invalida) {
+      setError(invalida);
+      return;
+    }
+    setError(null);
+    setEnviando(true);
+    try {
+      await restablecerContrasena(token, nueva);
+      navigate('/login', { replace: true });
+    } catch (err) {
+      setError(mensajeDeError(err, 'El enlace no es válido o expiró. Pide uno nuevo.'));
+      setEnviando(false);
     }
   }
 
@@ -42,7 +74,41 @@ export default function ResetPassword() {
           </h1>
         </div>
 
-        {enviado ? (
+        {token ? (
+          <form onSubmit={handleNuevaContrasena} className="space-y-7">
+            <p className="text-sm text-white/50 leading-relaxed">
+              Elige tu nueva contraseña.
+            </p>
+            {error && <FormError>{error}</FormError>}
+            <Field
+              label="Nueva contraseña"
+              type="password"
+              required
+              value={nueva}
+              onChange={(e) => setNueva(e.target.value)}
+              autoComplete="new-password"
+            />
+            <Field
+              label="Confirmar contraseña"
+              type="password"
+              required
+              value={confirmacion}
+              onChange={(e) => setConfirmacion(e.target.value)}
+              autoComplete="new-password"
+            />
+            <Button type="submit" disabled={enviando} variant="block-dark">
+              {enviando ? 'Guardando…' : 'Cambiar contraseña'}
+            </Button>
+            <div className="text-center">
+              <a
+                href="/reset-password"
+                className="text-xs uppercase tracking-widest text-white/40 hover:text-[#C9A84C] transition-colors"
+              >
+                Pedir un enlace nuevo
+              </a>
+            </div>
+          </form>
+        ) : enviado ? (
           <div className="text-center space-y-6">
             <p className="text-base text-white/60 leading-relaxed">
               Si <strong className="text-white/70">{email}</strong> está registrado,
@@ -60,6 +126,7 @@ export default function ResetPassword() {
             <p className="text-sm text-white/50 leading-relaxed">
               Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.
             </p>
+            {error && <FormError>{error}</FormError>}
             <Field
               label="Correo electrónico"
               type="email"

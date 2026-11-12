@@ -49,7 +49,7 @@ export default function SearchResults() {
       queryAnterior.current = query;
       limpiarFiltros();
     }
-  }, [query]);
+  }, [query, limpiarFiltros]);
 
   const total = productosFiltrados.length;
 

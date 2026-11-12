@@ -7,17 +7,18 @@
 // backend solo modela PENDIENTE/CONFIRMADO/EN_CAMINO/ENTREGADO/CANCELADO.
 // ============================================================
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { motion } from "motion/react";
 import { ChevronLeft, ChevronRight, Package, Star } from "lucide-react";
 import { useProductos } from "../context/ProductosContext";
 import { ordersApi, type EstadoPedido, type Pedido } from "../api/orders";
-import type { PaginaMeta } from "../api/common";
+import type { Paginado } from "../api/common";
 import { formatPrecio, formatFecha } from "../lib/format";
 import { AvisoError } from "../components/AvisoError";
 import { Button } from "../components/ds/Button";
 import { usePendientesDeResena } from "../hooks/useResenas";
+import { useApiQuery } from "../hooks/useApiQuery";
 
 // Presentación propia de la tienda (el panel admin usa colores en vez de dorado).
 const ESTADO: Record<EstadoPedido, { label: string; dorado: boolean }> = {
@@ -34,26 +35,13 @@ export default function AccountOrders() {
   const { productos } = useProductos();
   const pendientesDeResena = usePendientesDeResena(true);
 
-  const [pedidos, setPedidos] = useState<Pedido[]>([]);
-  const [meta, setMeta] = useState<PaginaMeta | null>(null);
   const [page, setPage] = useState(1);
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState(false);
-
-  const cargarPedidos = useCallback(() => {
-    setCargando(true);
-    setError(false);
-    ordersApi
-      .listar({ page, limit: LIMIT })
-      .then((data) => {
-        setPedidos(data.data);
-        setMeta(data.meta);
-      })
-      .catch(() => setError(true))
-      .finally(() => setCargando(false));
-  }, [page]);
-
-  useEffect(() => { cargarPedidos(); }, [cargarPedidos]);
+  const query = useApiQuery<Paginado<Pedido>>(
+    (signal) => ordersApi.listar({ page, limit: LIMIT }, signal),
+    [page],
+  );
+  const pedidos = query.data?.data ?? [];
+  const meta = query.data?.meta ?? null;
 
   // Miniatura por producto — no viene en la línea del pedido (solo guarda nombre/precio),
   // así que se resuelve del catálogo ya cargado en memoria (sin pedir de más).
@@ -74,13 +62,13 @@ export default function AccountOrders() {
         Mis pedidos
       </motion.h1>
 
-      {error ? (
+      {query.error ? (
         <AvisoError
           titulo="No pudimos cargar tus pedidos"
           detalle="Revisá tu conexión y volvé a intentarlo en un momento."
-          onRetry={cargarPedidos}
+          onRetry={query.refetch}
         />
-      ) : cargando ? (
+      ) : query.loading ? (
         <p className="text-white/40 text-center py-20">Cargando pedidos...</p>
       ) : pedidos.length === 0 ? (
         <div className="text-center py-20">

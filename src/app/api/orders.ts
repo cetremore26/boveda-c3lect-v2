@@ -70,6 +70,15 @@ export interface NuevoPedido {
   shippingInfo: DatosEnvio;
   fbp?: string;
   fbc?: string;
+  /** UUID generado al montar el checkout; el backend deduplica reintentos. */
+  idempotencyKey?: string;
+}
+
+export interface PedidoCreado {
+  id: string;
+  orderNumber: string;
+  subtotal: number;
+  total: number;
 }
 
 export const ordersApi = {
@@ -91,11 +100,8 @@ export const ordersApi = {
     await api.patch(`/orders/${id}/status`, { status });
   },
 
-  async crear(pedido: NuevoPedido) {
-    const { data } = await api.post<{ id: string; orderNumber: string }>(
-      '/orders',
-      pedido,
-    );
+  async crear(pedido: NuevoPedido): Promise<PedidoCreado> {
+    const { data } = await api.post<PedidoCreado>('/orders', pedido);
     return data;
   },
 };

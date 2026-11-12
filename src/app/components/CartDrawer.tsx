@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { X, Minus, Plus, ShoppingBag, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useCart, formatPrecio } from "../context/CartContext";
+import { MAX_CANTIDAD_POR_PRODUCTO, MAX_LINEAS, topeDeCantidad } from "../lib/carrito";
 import { usePrecioDe } from "../hooks/usePrecio";
 import type { Producto } from "../data/types";
 import { CONFIG } from "../config";
@@ -33,7 +34,9 @@ function buildWhatsAppMessage(
 }
 
 export default function CartDrawer() {
-  const { items, isOpen, closeCart, removeItem, updateQty, clearCart, totalItems, totalPrice } = useCart();
+  const {
+    items, noDisponibles, resolviendo, lleno, isOpen, closeCart, removeItem, updateQty, clearCart, totalItems, totalPrice,
+  } = useCart();
   const precioDe = usePrecioDe();
   const navigate = useNavigate();
 
@@ -85,7 +88,7 @@ export default function CartDrawer() {
                 )}
               </div>
               <div className="flex items-center gap-3">
-                {items.length > 0 && (
+                {totalItems > 0 && (
                   <button
                     onClick={clearCart}
                     className="text-xs uppercase tracking-widest text-white/30 hover:text-white transition-colors"
@@ -104,7 +107,11 @@ export default function CartDrawer() {
               </div>
             </div>
 
-            {items.length === 0 ? (
+            {resolviendo ? (
+              <div className="flex-1 flex items-center justify-center px-6 text-center">
+                <p className="text-white/50 tracking-wide">Cargando tu carrito…</p>
+              </div>
+            ) : items.length === 0 && noDisponibles.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
                 <ShoppingBag size={48} className="text-white/40" />
                 <p className="text-white/70 tracking-wide">Tu carrito está vacío</p>
@@ -180,7 +187,7 @@ export default function CartDrawer() {
                               </span>
                               <button
                                 onClick={() => updateQty(item.producto.id, item.cantidad + 1)}
-                                disabled={item.producto.stock != null && item.cantidad >= item.producto.stock}
+                                disabled={item.cantidad >= topeDeCantidad(item.producto.stock)}
                                 className="px-2.5 py-1.5 text-white/50 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-white/50"
                                 aria-label="Aumentar cantidad"
                               >
@@ -188,15 +195,47 @@ export default function CartDrawer() {
                               </button>
                             </div>
                           </div>
-                          {item.producto.stock != null && item.cantidad >= item.producto.stock && (
-                            <p className="text-xs text-white/30 text-right">Stock máximo disponible</p>
+                          {item.cantidad >= topeDeCantidad(item.producto.stock) && (
+                            <p className="text-xs text-white/30 text-right">
+                              {item.producto.stock != null && item.producto.stock <= MAX_CANTIDAD_POR_PRODUCTO
+                                ? "Stock máximo disponible"
+                                : `Máximo ${MAX_CANTIDAD_POR_PRODUCTO} unidades por producto`}
+                            </p>
                           )}
                         </div>
                       </motion.div>
                     ))}
                   </AnimatePresence>
+
+                  {noDisponibles.length > 0 && (
+                    <div className="pt-4 border-t border-white/10 space-y-3">
+                      <p className="text-[10px] uppercase tracking-widest text-white/40">No disponibles</p>
+                      {noDisponibles.map((linea) => (
+                        <div key={linea.id} className="flex items-center justify-between gap-3">
+                          <p className="text-sm text-white/50 min-w-0">
+                            {linea.motivo === "agotado" && linea.producto
+                              ? `${linea.producto.display} — Agotado`
+                              : "Un producto que agregaste ya no está en el catálogo"}
+                          </p>
+                          <button
+                            onClick={() => removeItem(linea.id)}
+                            className="shrink-0 text-xs uppercase tracking-widest text-white/40 hover:text-white transition-colors"
+                          >
+                            Quitar
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {lleno && (
+                    <p className="text-xs text-white/40">
+                      Tu carrito tiene el máximo de {MAX_LINEAS} productos distintos por pedido.
+                    </p>
+                  )}
                 </div>
 
+                {items.length > 0 && (
                 <div className="px-6 py-6 border-t border-white/10 space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-xs uppercase tracking-widest text-white/50">
@@ -226,6 +265,7 @@ export default function CartDrawer() {
                     O pregúntanos por WhatsApp
                   </a>
                 </div>
+                )}
               </>
             )}
           </motion.div>

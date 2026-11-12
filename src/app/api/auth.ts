@@ -13,16 +13,26 @@ export interface Sesion {
   user: UsuarioSesion;
 }
 
+export interface DesafioSegundoFactor {
+  requiresSecondFactor: true;
+  challengeToken: string;
+}
+
 export const authApi = {
   async login(email: string, password: string) {
-    const { data } = await api.post<Sesion>('/auth/login', { email, password });
+    const { data } = await api.post<Sesion | DesafioSegundoFactor>('/auth/login', { email, password });
+    return data;
+  },
+
+  async loginSegundoFactor(challengeToken: string, code: string) {
+    const { data } = await api.post<Sesion>('/auth/login/2fa', { challengeToken, code });
     return data;
   },
 
   /** Sin cuenta para ese email devuelve { requiresRegistration: true }. */
   async verificarOtp(email: string, code: string) {
     const { data } = await api.post<
-      Partial<Sesion> & { requiresRegistration?: boolean }
+      Partial<Sesion> & { requiresRegistration?: boolean; registrationToken?: string }
     >('/auth/verify-otp', { email, code });
     return data;
   },
@@ -32,6 +42,7 @@ export const authApi = {
     password: string;
     nombre: string;
     telefono?: string;
+    registrationToken?: string;
   }) {
     const { data } = await api.post<Sesion>('/auth/register', datos);
     return data;
@@ -48,6 +59,10 @@ export const authApi = {
 
   async solicitarOtp(email: string) {
     await api.post('/auth/request-otp', { email });
+  },
+
+  async restablecerContrasena(token: string, newPassword: string) {
+    await api.post('/auth/reset-password', { token, newPassword });
   },
 
   async solicitarRestablecimiento(email: string) {
