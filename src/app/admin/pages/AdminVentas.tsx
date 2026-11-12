@@ -2,7 +2,7 @@ import { Check, ChevronLeft, ChevronRight, Download, Pencil, Plus, Trash2, X } f
 import { formatPrecio as COP, formatFecha as fmtFecha } from '../../lib/format';
 import { useVentas } from '../ventas/useVentas';
 import { VentaForm } from '../ventas/VentaForm';
-import { CATEGORIAS_FILTRO, ESTADO_VENTA as ESTADO_CONFIG, ESTADOS, FUENTES } from '../ventas/venta-form';
+import { CATEGORIAS_FILTRO, ESTADO_VENTA as ESTADO_CONFIG, ESTADOS, formVacio, FUENTES } from '../ventas/venta-form';
 
 export default function AdminVentas() {
   const {
@@ -29,7 +29,7 @@ export default function AdminVentas() {
             style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.1)' }}>
             <Download size={15} />{exportando ? 'Exportando…' : 'CSV'}
           </button>
-          <button onClick={() => { setShowForm(!showForm); setEditId(null); }}
+          <button onClick={() => { if (!showForm) setForm(formVacio()); setShowForm(!showForm); setEditId(null); }}
             className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium"
             style={{ background: 'rgba(201,168,76,0.15)', color: '#C9A84C', border: '1px solid rgba(201,168,76,0.3)' }}>
             {showForm ? <X size={15} /> : <Plus size={15} />}

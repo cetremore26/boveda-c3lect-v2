@@ -11,8 +11,8 @@ import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { exportCSV } from './exportar-csv';
 import {
   datosDesdeForm,
-  EMPTY_FORM,
   formDesdeVenta,
+  formVacio,
   type FormState,
 } from './venta-form';
 
@@ -28,13 +28,13 @@ export function useVentas() {
   const [desde, setDesde]       = useState('');
   const [hasta, setHasta]       = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm]         = useState<FormState>(EMPTY_FORM);
+  const [form, setForm]         = useState<FormState>(formVacio);
   const [guardando, setGuardando] = useState(false);
   const [exportando, setExportando] = useState(false);
   const [formError, setFormError] = useState('');
   const [resumen, setResumen] = useState({ totalVendido: 0, pendienteCobro: 0 });
   const [editId, setEditId]     = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<FormState>(EMPTY_FORM);
+  const [editForm, setEditForm] = useState<FormState>(formVacio);
   const [editError, setEditError] = useState('');
   const [eliminando, setEliminando] = useState<string | null>(null);
 
@@ -110,7 +110,7 @@ export function useVentas() {
     try {
       await ventasApi.crear(datosDesdeForm(form));
       setShowForm(false);
-      setForm(EMPTY_FORM);
+      setForm(formVacio());
       setPage(1);
       ventasQuery.refetch();
     } catch (err) {

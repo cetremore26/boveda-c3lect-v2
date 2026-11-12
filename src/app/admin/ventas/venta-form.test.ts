@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import { recalcEstado, datosDesdeForm, EMPTY_FORM } from './venta-form';
+import { describe, it, expect, vi } from 'vitest';
+import { recalcEstado, datosDesdeForm, formVacio } from './venta-form';
 
-const base = { ...EMPTY_FORM, precioVenta: '100000' };
+const base = { ...formVacio(), precioVenta: '100000' };
 
 describe('recalcEstado', () => {
   it('abono completo -> Pagado', () => {
@@ -14,7 +14,7 @@ describe('recalcEstado', () => {
     expect(recalcEstado({ ...base, abono: '' }).estado).toBe('Pendiente');
   });
   it.each(['', '0'])('precioVenta "%s" conserva el estado', (pv) => {
-    const f = { ...EMPTY_FORM, precioVenta: pv, abono: '5', estado: 'Uso Personal' };
+    const f = { ...formVacio(), precioVenta: pv, abono: '5', estado: 'Uso Personal' };
     expect(recalcEstado(f)).toEqual(f);
   });
 });
@@ -22,7 +22,7 @@ describe('recalcEstado', () => {
 describe('datosDesdeForm', () => {
   it('convierte números y vacíos opcionales a undefined', () => {
     const d = datosDesdeForm({
-      ...EMPTY_FORM,
+      ...formVacio(),
       precioVenta: '100000',
       costoProducto: '60000',
       costoEnvio: '5000',
@@ -38,5 +38,16 @@ describe('datosDesdeForm', () => {
     expect(d.celular).toBeUndefined();
     expect(d.estilo).toBeUndefined();
     expect(d.fuente).toBeUndefined();
+  });
+});
+
+describe('formVacio', () => {
+  it('fecha con el día de hoy en cada llamada', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 3, 9));
+    expect(formVacio().fecha).toBe('2026-11-03');
+    vi.setSystemTime(new Date(2026, 10, 5, 21));
+    expect(formVacio().fecha).toBe('2026-11-05');
+    vi.useRealTimers();
   });
 });

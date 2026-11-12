@@ -2,23 +2,25 @@ import { useState } from 'react';
 import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
 import { gastosApi, type Gasto } from '../../api/gastos';
 import { mensajeDeError } from '../../api/common';
-import { formatPrecio as COP, formatFecha as fmtFecha } from '../../lib/format';
+import { formatPrecio as COP, formatFecha as fmtFecha, hoyLocal } from '../../lib/format';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 
 
-const EMPTY_FORM = {
-  fecha: new Date().toISOString().split('T')[0],
-  concepto: '', monto: '', responsable: '', estado: 'Pagado',
-};
+function formVacio() {
+  return {
+    fecha: hoyLocal(),
+    concepto: '', monto: '', responsable: '', estado: 'Pagado',
+  };
+}
 
 export default function AdminGastos() {
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm]       = useState(EMPTY_FORM);
+  const [form, setForm]       = useState(formVacio);
   const [guardando, setGuardando] = useState(false);
   const [formError, setFormError] = useState('');
   const [editId, setEditId]   = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<typeof EMPTY_FORM>>({});
+  const [editForm, setEditForm] = useState<Partial<ReturnType<typeof formVacio>>>({});
   const [eliminando, setEliminando] = useState<string | null>(null);
 
   const gastosQuery = useApiQuery<Gasto[]>(async (signal) => {
@@ -42,7 +44,7 @@ export default function AdminGastos() {
         estado: form.estado || undefined,
       });
       setShowForm(false);
-      setForm(EMPTY_FORM);
+      setForm(formVacio());
       gastosQuery.refetch();
     } catch (err) {
       setFormError(mensajeDeError(err, 'Error al guardar'));
@@ -79,7 +81,7 @@ export default function AdminGastos() {
           <h1 className="text-2xl font-semibold text-white mb-1">Gastos Adicionales</h1>
           <p className="text-sm text-white/40">Total: <span className="text-[#C9A84C]">{COP(total)}</span></p>
         </div>
-        <button onClick={() => setShowForm(!showForm)}
+        <button onClick={() => { if (!showForm) setForm(formVacio()); setShowForm(!showForm); }}
           className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium"
           style={{ background: 'rgba(201,168,76,0.15)', color: '#C9A84C', border: '1px solid rgba(201,168,76,0.3)' }}>
           {showForm ? <X size={15} /> : <Plus size={15} />}
