@@ -5,6 +5,8 @@ import { useCart, formatPrecio } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { usePrecioDe } from '../hooks/usePrecio';
 import { submitCheckout, CheckoutUrlInvalidaError, type MetodoPago, type OrderResponse } from '../lib/checkout';
+import { borrarPendingCheckout, guardarPendingCheckout } from '../lib/checkoutPendiente';
+import { mensajeDeError } from '../api/common';
 import { Field, FieldArea } from '../components/ds/Field';
 import { FormError } from '../components/ds/FormError';
 import { Button } from '../components/ds/Button';
@@ -25,6 +27,7 @@ export default function Checkout() {
     direccion: '',
     notas: '',
   });
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('MERCADOPAGO');
   const [error, setError] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -57,8 +60,15 @@ export default function Checkout() {
           <h1 className="text-3xl mb-4 text-white" style={{ fontFamily: 'var(--font-serif)', fontWeight: 300 }}>
             Pedido recibido
           </h1>
-          <p className="text-white/60 text-sm leading-relaxed mb-8">
+          <p className="text-white/60 text-sm leading-relaxed mb-4">
             Tu número de pedido es <strong className="text-white">#{pedidoConfirmado.orderNumber}</strong>.
+          </p>
+          {pedidoConfirmado.total !== undefined && (
+            <p className="text-white/60 text-sm leading-relaxed mb-4">
+              Total a pagar contra entrega: <strong className="text-white">{formatPrecio(pedidoConfirmado.total)}</strong>
+            </p>
+          )}
+          <p className="text-white/60 text-sm leading-relaxed mb-8">
             Te contactaremos para coordinar la entrega y el pago contra entrega.
           </p>
           <Button as={Link} to="/catalog" variant="block-dark">
@@ -74,11 +84,14 @@ export default function Checkout() {
     setError('');
     setEnviando(true);
     try {
-      const result = await submitCheckout({ items, totalPrice, metodoPago, form, idempotencyKey: crypto.randomUUID() });
-      clearCart();
+      const result = await submitCheckout({ items, totalPrice, metodoPago, form, idempotencyKey });
       if (result.kind === 'contraentrega') {
+        clearCart();
+        borrarPendingCheckout(localStorage);
         setPedidoConfirmado(result.order);
       } else {
+        // El carrito se vacía solo en /checkout/success, cuando MercadoPago aprueba el pago.
+        guardarPendingCheckout(localStorage, Date.now());
         window.location.href = result.checkoutUrl;
       }
     } catch (err: unknown) {
@@ -87,8 +100,7 @@ export default function Checkout() {
         setEnviando(false);
         return;
       }
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setError(msg ?? 'No se pudo procesar el pedido. Intenta de nuevo.');
+      setError(mensajeDeError(err, 'No se pudo procesar el pedido. Intenta de nuevo.'));
       setEnviando(false);
     }
   }
