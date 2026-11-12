@@ -1,4 +1,4 @@
-import type { CartItem } from '../context/CartContext';
+import type { CartItem } from './carrito';
 import { ordersApi, type MetodoPago, type PedidoCreado } from '../api/orders';
 import { paymentsApi } from '../api/payments';
 import {

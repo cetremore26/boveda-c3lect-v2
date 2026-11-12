@@ -12,7 +12,7 @@ import { FormError } from '../components/ds/FormError';
 import { Button } from '../components/ds/Button';
 
 export default function Checkout() {
-  const { items, totalPrice, clearCart } = useCart();
+  const { items, noDisponibles, resolviendo, totalPrice, clearCart } = useCart();
   const { user } = useAuth();
   const precioDe = usePrecioDe();
   const precioUnitarioDe = (producto: (typeof items)[number]['producto']) =>
@@ -36,6 +36,14 @@ export default function Checkout() {
   function set<K extends keyof typeof form>(key: K) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setForm((f) => ({ ...f, [key]: e.target.value }));
+  }
+
+  if (resolviendo && !pedidoConfirmado) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-6 bg-[#0A0A0A]">
+        <p className="text-white/50 tracking-wide">Cargando tu carrito…</p>
+      </div>
+    );
   }
 
   if (items.length === 0 && !pedidoConfirmado) {
@@ -115,6 +123,12 @@ export default function Checkout() {
           <h1 className="text-4xl md:text-5xl mb-10 text-white" style={{ fontFamily: 'var(--font-serif)', fontWeight: 300 }}>
             Finalizar pedido
           </h1>
+
+          {noDisponibles.length > 0 && (
+            <p className="mb-8 border border-[#C9A84C]/40 px-4 py-3 text-sm text-white/70">
+              Algunos productos de tu carrito ya no están disponibles y no se incluirán en este pedido.
+            </p>
+          )}
 
           {error && <div className="mb-8"><FormError>{error}</FormError></div>}
 

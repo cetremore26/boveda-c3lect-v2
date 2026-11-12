@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { authApi, type UsuarioSesion } from '../api/auth';
-import { borrarSesionGuardada, debeCerrarSesionAlArrancar, escucharSesionCerrada } from '../lib/sesion';
+import { borrarSesionGuardada, debeCerrarSesionAlArrancar, emitirSesionCerrada, escucharSesionCerrada } from '../lib/sesion';
+import { borrarCarritoGuardado } from '../lib/carrito';
 
 type AuthUser = UsuarioSesion;
 
@@ -116,6 +117,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // ignorar error — el token puede estar expirado
     }
     clearSession();
+    // El carrito no debe pasar a la siguiente persona que use este navegador.
+    // Se borra del almacenamiento aquí (cubre /admin, donde CartProvider no
+    // está montado) y el evento vacía el carrito en memoria si lo está.
+    try {
+      borrarCarritoGuardado(localStorage);
+    } catch {
+      // localStorage no disponible: no hay carrito guardado que borrar.
+    }
+    emitirSesionCerrada('logout');
     setAccessToken(null);
     setUser(null);
   }

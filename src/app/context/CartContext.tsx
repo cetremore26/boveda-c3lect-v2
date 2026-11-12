@@ -1,84 +1,34 @@
-import { createContext, useContext, useReducer, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useReducer, useEffect, useMemo, type ReactNode } from "react";
 import type { Producto } from "../data/types";
 import { usePrecioDe } from "../hooks/usePrecio";
+import { useProductos } from "./ProductosContext";
+import { escucharSesionCerrada } from "../lib/sesion";
+import {
+  carritoReducer,
+  leerLineasGuardadas,
+  guardarLineas,
+  resolverCarrito,
+  puedeAgregar,
+  MAX_LINEAS,
+  type CartItem,
+  type LineaNoDisponible,
+} from "../lib/carrito";
 
-export interface CartItem {
-  producto: Producto;
-  cantidad: number;
-}
-
-export interface CartState {
-  items: CartItem[];
-  isOpen: boolean;
-}
-
-export type CartAction =
-  | { type: "ADD"; producto: Producto }
-  | { type: "REMOVE"; id: string }
-  | { type: "UPDATE_QTY"; id: string; cantidad: number }
-  | { type: "CLEAR" }
-  | { type: "OPEN" }
-  | { type: "CLOSE" }
-  | { type: "TOGGLE" };
-
-export function cartReducer(state: CartState, action: CartAction): CartState {
-  switch (action.type) {
-    case "ADD": {
-      const max = action.producto.stock;
-      const existing = state.items.find((i) => i.producto.id === action.producto.id);
-      if (existing) {
-        const cantidad = max != null ? Math.min(existing.cantidad + 1, max) : existing.cantidad + 1;
-        return {
-          ...state,
-          isOpen: true,
-          items: state.items.map((i) =>
-            i.producto.id === action.producto.id ? { ...i, cantidad } : i
-          ),
-        };
-      }
-      const cantidadInicial = max != null ? Math.min(1, max) : 1;
-      if (cantidadInicial < 1) return { ...state, isOpen: true };
-      return {
-        ...state,
-        isOpen: true,
-        items: [...state.items, { producto: action.producto, cantidad: cantidadInicial }],
-      };
-    }
-    case "REMOVE":
-      return { ...state, items: state.items.filter((i) => i.producto.id !== action.id) };
-    case "UPDATE_QTY": {
-      if (action.cantidad < 1) {
-        return { ...state, items: state.items.filter((i) => i.producto.id !== action.id) };
-      }
-      return {
-        ...state,
-        items: state.items.map((i) => {
-          if (i.producto.id !== action.id) return i;
-          const max = i.producto.stock;
-          const cantidad = max != null ? Math.min(action.cantidad, max) : action.cantidad;
-          return { ...i, cantidad };
-        }),
-      };
-    }
-    case "CLEAR":
-      return { ...state, items: [] };
-    case "OPEN":
-      return { ...state, isOpen: true };
-    case "CLOSE":
-      return { ...state, isOpen: false };
-    case "TOGGLE":
-      return { ...state, isOpen: !state.isOpen };
-    default:
-      return state;
-  }
-}
-
+export type { CartItem, LineaNoDisponible };
 export { formatPrecio } from '../lib/format';
 
 interface CartContextValue {
+  /** Solo productos comprables, con el producto y la cantidad del catálogo vigente. */
   items: CartItem[];
+  /** Líneas guardadas que ya no se pueden comprar (agotadas o retiradas del catálogo). */
+  noDisponibles: LineaNoDisponible[];
+  /** true mientras el catálogo no ha cargado (o falló): aún no se sabe qué es comprable. */
+  resolviendo: boolean;
+  /** true si el carrito ya tiene MAX_LINEAS productos distintos. */
+  lleno: boolean;
   isOpen: boolean;
-  addItem: (producto: Producto) => void;
+  /** Devuelve false si el producto no cabe (carrito lleno). */
+  addItem: (producto: Producto) => boolean;
   removeItem: (id: string) => void;
   updateQty: (id: string, cantidad: number) => void;
   clearCart: () => void;
@@ -91,45 +41,77 @@ interface CartContextValue {
 
 const CartContext = createContext<CartContextValue | null>(null);
 
-function loadCart(): CartItem[] {
+function leerCarritoInicial() {
   try {
-    const saved = localStorage.getItem("c3lect-cart");
-    return saved ? (JSON.parse(saved) as CartItem[]) : [];
+    return leerLineasGuardadas(localStorage);
   } catch {
     return [];
   }
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(cartReducer, { items: loadCart(), isOpen: false });
+  const [state, dispatch] = useReducer(carritoReducer, undefined, () => ({
+    lineas: leerCarritoInicial(),
+    isOpen: false,
+  }));
+  const { productos, cargando, error } = useProductos();
+  const catalogoListo = !cargando && !error;
   const precioDe = usePrecioDe();
 
   useEffect(() => {
     try {
-      localStorage.setItem("c3lect-cart", JSON.stringify(state.items));
+      guardarLineas(localStorage, state.lineas);
     } catch {
-      // localStorage no disponible (modo privado o cuota llena): el carrito sigue en memoria.
+      // localStorage no disponible: el carrito sigue en memoria.
     }
-  }, [state.items]);
+  }, [state.lineas]);
 
-  const totalItems = state.items.reduce((acc, i) => acc + i.cantidad, 0);
-  // Precio de línea tomado del catálogo vigente en cada render (nunca del
-  // guardado en localStorage), para reflejar promociones que cambien o
-  // expiren mientras el producto sigue en el carrito. El cobro real siempre
+  useEffect(
+    () => escucharSesionCerrada((m) => {
+      if (m === "logout") dispatch({ type: "CLEAR" });
+    }),
+    [],
+  );
+
+  const resuelto = useMemo(
+    () => resolverCarrito(state.lineas, productos, catalogoListo),
+    [state.lineas, productos, catalogoListo],
+  );
+  // Un carrito vacío no tiene nada que resolver: no se queda "cargando".
+  const resolviendo = resuelto.resolviendo && state.lineas.length > 0;
+
+  // Suma de lo guardado (no de lo resuelto) para que el contador del menú
+  // aparezca antes de que cargue el catálogo.
+  const totalItems = state.lineas.reduce((acc, l) => acc + l.cantidad, 0);
+  // Precio tomado del catálogo vigente en cada render. El cobro real siempre
   // lo recalcula el backend.
-  const totalPrice = state.items.reduce(
+  const totalPrice = resuelto.items.reduce(
     (acc, i) => acc + precioDe(i.producto).precioFinal * i.cantidad,
     0,
   );
 
+  function addItem(producto: Producto): boolean {
+    const cabe = puedeAgregar(state.lineas, producto.id);
+    dispatch({ type: "ADD", id: producto.id, max: producto.stock });
+    return cabe;
+  }
+
+  function updateQty(id: string, cantidad: number) {
+    const max = productos.find((p) => p.id === id)?.stock;
+    dispatch({ type: "UPDATE_QTY", id, cantidad, max });
+  }
+
   return (
     <CartContext.Provider
       value={{
-        items: state.items,
+        items: resuelto.items,
+        noDisponibles: resuelto.noDisponibles,
+        resolviendo,
+        lleno: state.lineas.length >= MAX_LINEAS,
         isOpen: state.isOpen,
-        addItem: (p) => dispatch({ type: "ADD", producto: p }),
+        addItem,
         removeItem: (id) => dispatch({ type: "REMOVE", id }),
-        updateQty: (id, cantidad) => dispatch({ type: "UPDATE_QTY", id, cantidad }),
+        updateQty,
         clearCart: () => dispatch({ type: "CLEAR" }),
         openCart: () => dispatch({ type: "OPEN" }),
         closeCart: () => dispatch({ type: "CLOSE" }),
