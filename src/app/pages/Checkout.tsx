@@ -4,7 +4,7 @@ import { CreditCard, Truck, CheckCircle2 } from 'lucide-react';
 import { useCart, formatPrecio } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { usePrecioDe } from '../hooks/usePrecio';
-import { submitCheckout, type MetodoPago, type OrderResponse } from '../lib/checkout';
+import { submitCheckout, CheckoutUrlInvalidaError, type MetodoPago, type OrderResponse } from '../lib/checkout';
 import { Field, FieldArea } from '../components/ds/Field';
 import { FormError } from '../components/ds/FormError';
 import { Button } from '../components/ds/Button';
@@ -82,6 +82,11 @@ export default function Checkout() {
         window.location.href = result.checkoutUrl;
       }
     } catch (err: unknown) {
+      if (err instanceof CheckoutUrlInvalidaError) {
+        setError(err.message);
+        setEnviando(false);
+        return;
+      }
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       setError(msg ?? 'No se pudo procesar el pedido. Intenta de nuevo.');
       setEnviando(false);

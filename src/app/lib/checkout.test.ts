@@ -51,6 +51,7 @@ describe('esUrlDeMercadoPago', () => {
     'https://www.mercadopago.com.co/checkout/v1/redirect?pref_id=1',
     'https://sandbox.mercadopago.com.co/checkout/v1/redirect?pref_id=1',
     'https://www.mercadopago.com/checkout/v1/redirect?pref_id=1',
+    'https://WWW.MERCADOPAGO.COM.CO/x',
   ])('acepta %s', (u) => expect(esUrlDeMercadoPago(u)).toBe(true));
 
   it.each([
@@ -60,6 +61,7 @@ describe('esUrlDeMercadoPago', () => {
     'https://mercadopago.com.co.evil.com/x',
     'https://evilmercadopago.com/x',
     'javascript:alert(1)',
+    'https://user@evil.com/?x=mercadopago.com',
   ])('rechaza %j', (u) => expect(esUrlDeMercadoPago(u)).toBe(false));
 });
 
@@ -89,6 +91,12 @@ describe('submitCheckout CONTRAENTREGA', () => {
     // El Purchase usa el total del backend, no el del carrito.
     expect(trackPurchase).toHaveBeenCalledWith({ orderNumber: 'C3-001', items, total: 260000 });
     expect(paymentsApi.crearPendiente).not.toHaveBeenCalled();
+  });
+
+  it('si el backend no devuelve total, el Purchase usa el total del carrito', async () => {
+    vi.mocked(ordersApi.crear).mockResolvedValue({ id: 'o1', orderNumber: 'C3-001' } as never);
+    await submitCheckout({ items, totalPrice: 250000, metodoPago: 'CONTRAENTREGA', form, idempotencyKey: 'k' });
+    expect(trackPurchase).toHaveBeenCalledWith({ orderNumber: 'C3-001', items, total: 250000 });
   });
 
   it('si crear rechaza, rechaza y no registra Purchase', async () => {

@@ -20,7 +20,8 @@ export interface ShippingForm {
   notas: string;
 }
 
-export type OrderResponse = PedidoCreado;
+// `total` puede faltar si responde una versión antigua de la API: ver el respaldo en submitCheckout.
+export type OrderResponse = Omit<PedidoCreado, 'total'> & { total?: number };
 
 export const DOMINIOS_MERCADOPAGO = ['mercadopago.com.co', 'mercadopago.com'] as const;
 
@@ -93,7 +94,7 @@ export async function submitCheckout(params: {
     // El Purchase de contraentrega va AQUÍ: esta rama nunca navega a
     // /checkout/success — el caller muestra la confirmación en la misma
     // página, así que este es el único momento en que hay items/total que enviar.
-    trackPurchase({ orderNumber: order.orderNumber, items, total: order.total });
+    trackPurchase({ orderNumber: order.orderNumber, items, total: order.total ?? totalPrice });
 
     return { kind: 'contraentrega', order };
   }
