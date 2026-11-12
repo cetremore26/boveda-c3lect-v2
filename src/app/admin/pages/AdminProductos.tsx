@@ -181,7 +181,7 @@ export default function AdminProductos() {
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
+    if (guardandoOrden || !over || active.id === over.id) return;
     const anterior = ordenIds;
     const next = moverEnOrden(ordenIds, String(active.id), String(over.id));
     setOrdenIds(next);

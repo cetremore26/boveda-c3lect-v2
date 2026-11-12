@@ -24,7 +24,11 @@ export function destinoSeguro(
     // resultado, no el texto.
     const url = new URL(valor, origen);
     if (url.origin !== origen || RUTAS_DE_ACCESO.includes(url.pathname)) return DESTINO_POR_DEFECTO;
-    return url.pathname + url.search + url.hash;
+    const destino = url.pathname + url.search + url.hash;
+    // "/.//evil.com" resuelve al mismo origen con pathname "//evil.com": un
+    // consumidor que lo asigne a location lo trataría como protocolo-relativo.
+    if (destino.startsWith("//") || destino.startsWith("/\\")) return DESTINO_POR_DEFECTO;
+    return destino;
   } catch {
     return DESTINO_POR_DEFECTO;
   }
