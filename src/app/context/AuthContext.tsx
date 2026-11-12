@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { authApi, type UsuarioSesion } from '../api/auth';
+import { borrarSesionGuardada, escucharSesionCerrada } from '../lib/sesion';
 
 type AuthUser = UsuarioSesion;
 
@@ -27,16 +28,13 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function saveSession(accessToken: string, refreshToken: string, user: AuthUser) {
+function saveSession(accessToken: string, refreshToken: string) {
   sessionStorage.setItem('accessToken', accessToken);
   sessionStorage.setItem('refreshToken', refreshToken);
-  sessionStorage.setItem('authUser', JSON.stringify(user));
 }
 
 function clearSession() {
-  sessionStorage.removeItem('accessToken');
-  sessionStorage.removeItem('refreshToken');
-  sessionStorage.removeItem('authUser');
+  borrarSesionGuardada();
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -57,26 +55,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAccessToken(storedToken);
       })
       .catch(() => {
-        // Fallback: leer usuario del sessionStorage si /auth/me no existe aún
-        const stored = sessionStorage.getItem('authUser');
-        if (stored) {
-          try {
-            setUser(JSON.parse(stored));
-            setAccessToken(storedToken);
-          } catch {
-            clearSession();
-          }
-        } else {
-          clearSession();
-        }
+        clearSession();
+        setUser(null);
       })
       .finally(() => setCargando(false));
   }, []);
 
+  useEffect(
+    () => escucharSesionCerrada((m) => {
+      if (m === 'expirada') {
+        setUser(null);
+        setAccessToken(null);
+      }
+    }),
+    [],
+  );
+
   async function login(email: string, password: string) {
     const data = await authApi.login(email, password);
     if ('accessToken' in data && data.accessToken) {
-      saveSession(data.accessToken, data.refreshToken, data.user);
+      saveSession(data.accessToken, data.refreshToken);
       setAccessToken(data.accessToken);
       setUser(data.user);
       return {};
@@ -89,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function completarSegundoFactor(challengeToken: string, code: string) {
     const data = await authApi.loginSegundoFactor(challengeToken, code);
-    saveSession(data.accessToken, data.refreshToken, data.user);
+    saveSession(data.accessToken, data.refreshToken);
     setAccessToken(data.accessToken);
     setUser(data.user);
   }
@@ -97,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function loginConOtp(email: string, code: string) {
     const data = await authApi.verificarOtp(email, code);
     if (data.accessToken && data.user) {
-      saveSession(data.accessToken, data.refreshToken!, data.user);
+      saveSession(data.accessToken, data.refreshToken!);
       setAccessToken(data.accessToken);
       setUser(data.user);
     }
@@ -106,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function register(email: string, password: string, nombre: string, telefono?: string, registrationToken?: string) {
     const data = await authApi.registrar({ email, password, nombre, telefono, registrationToken });
-    saveSession(data.accessToken, data.refreshToken, data.user);
+    saveSession(data.accessToken, data.refreshToken);
     setAccessToken(data.accessToken);
     setUser(data.user);
   }
@@ -139,7 +137,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function refrescarUsuario() {
     const data = await authApi.yo();
     setUser(data);
-    sessionStorage.setItem('authUser', JSON.stringify(data));
   }
 
   return (

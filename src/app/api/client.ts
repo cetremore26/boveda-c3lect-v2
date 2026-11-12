@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { rutaDeAcceso } from '../lib/volver';
+import { borrarSesionGuardada, emitirSesionCerrada, esRutaProtegida } from '../lib/sesion';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -30,10 +31,9 @@ api.interceptors.request.use((config) => {
 });
 
 function clearSessionAndRedirect() {
-  sessionStorage.removeItem('accessToken');
-  sessionStorage.removeItem('refreshToken');
-  sessionStorage.removeItem('authUser');
-  if (window.location.pathname !== '/login') {
+  borrarSesionGuardada();
+  emitirSesionCerrada('expirada');
+  if (esRutaProtegida(window.location.pathname)) {
     window.location.href = rutaDeAcceso(window.location.pathname + window.location.search);
   }
 }
