@@ -13,15 +13,21 @@ const DESTINO_POR_DEFECTO = "/catalog";
 const RUTAS_DE_ACCESO = ["/login", "/register", "/reset-password"];
 
 /** Devuelve `valor` si es una ruta interna aceptable; si no, el destino por defecto. */
-export function destinoSeguro(valor: string | null | undefined): string {
-  if (!valor) return DESTINO_POR_DEFECTO;
-  // "/x" sí; "//evil.com", "/\evil.com" o "https://evil.com" no.
-  if (!valor.startsWith("/") || valor.startsWith("//") || valor.startsWith("/\\")) {
+export function destinoSeguro(
+  valor: string | null | undefined,
+  origen: string = typeof window !== "undefined" ? window.location.origin : "http://localhost",
+): string {
+  if (!valor || !valor.startsWith("/")) return DESTINO_POR_DEFECTO;
+  try {
+    // El parser de URL descarta tabuladores y saltos de línea y trata "\" como
+    // "/", así que "/	/evil.com" acabaría siendo "//evil.com": se valida el
+    // resultado, no el texto.
+    const url = new URL(valor, origen);
+    if (url.origin !== origen || RUTAS_DE_ACCESO.includes(url.pathname)) return DESTINO_POR_DEFECTO;
+    return url.pathname + url.search + url.hash;
+  } catch {
     return DESTINO_POR_DEFECTO;
   }
-  const ruta = valor.split(/[?#]/)[0];
-  if (RUTAS_DE_ACCESO.includes(ruta)) return DESTINO_POR_DEFECTO;
-  return valor;
 }
 
 /** `/login` (o `/register`) recordando a dónde volver después. */

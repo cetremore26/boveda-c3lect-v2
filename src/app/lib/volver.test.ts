@@ -26,6 +26,14 @@ describe('destinoSeguro', () => {
   );
 });
 
+describe('destinoSeguro con URL y origen', () => {
+  const O = 'https://tienda.test';
+  it.each(['/\t/evil.com', '/\n/evil.com', '/\\evil.com', '//evil.com', 'https://evil.com', 'javascript:alert(1)', '/login', '/reset-password?x=1'])(
+    'rechaza %j', (v) => expect(destinoSeguro(v, O)).toBe('/catalog'));
+  it('conserva ruta, query y fragmento internos', () =>
+    expect(destinoSeguro('/product/1?resenar=1#resenas', O)).toBe('/product/1?resenar=1#resenas'));
+});
+
 describe('rutaDeAcceso', () => {
   it('PARAM_VOLVER es "volver"', () => {
     expect(PARAM_VOLVER).toBe('volver');
