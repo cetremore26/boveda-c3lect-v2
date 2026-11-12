@@ -2,7 +2,7 @@ import { Check, ChevronLeft, ChevronRight, Download, Pencil, Plus, Trash2, X } f
 import { formatPrecio as COP, formatFecha as fmtFecha } from '../../lib/format';
 import { useVentas } from '../ventas/useVentas';
 import { VentaForm } from '../ventas/VentaForm';
-import { CATEGORIAS_FILTRO, ESTADO_VENTA as ESTADO_CONFIG, ESTADOS, FUENTES } from '../ventas/venta-form';
+import { CATEGORIAS_FILTRO, ESTADO_VENTA as ESTADO_CONFIG, ESTADOS, formVacio, FUENTES, MENSAJE_VENTA_DE_PEDIDO, puedeEliminarVenta } from '../ventas/venta-form';
 
 export default function AdminVentas() {
   const {
@@ -13,7 +13,7 @@ export default function AdminVentas() {
     showForm, setShowForm, form, setForm, formError, handleSubmit,
     editId, setEditId, editForm, setEditForm, editError, setEditError,
     handleEdit, handleEditSave,
-    guardando, exportando, handleExport, eliminando, handleDelete,
+    guardando, exportando, handleExport, eliminando, handleDelete, errorEliminar,
   } = useVentas();
 
   return (
@@ -29,7 +29,7 @@ export default function AdminVentas() {
             style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.1)' }}>
             <Download size={15} />{exportando ? 'Exportando…' : 'CSV'}
           </button>
-          <button onClick={() => { setShowForm(!showForm); setEditId(null); }}
+          <button onClick={() => { if (!showForm) setForm(formVacio()); setShowForm(!showForm); setEditId(null); }}
             className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium"
             style={{ background: 'rgba(201,168,76,0.15)', color: '#C9A84C', border: '1px solid rgba(201,168,76,0.3)' }}>
             {showForm ? <X size={15} /> : <Plus size={15} />}
@@ -68,8 +68,11 @@ export default function AdminVentas() {
           onCancel={() => { setEditId(null); setEditError(''); }}
           error={editError} saving={guardando} submitLabel="Guardar cambios"
           marcas={marcas} precios={precios} productos={productos} errorOpciones={errorOpciones}
+          edicion
         />
       )}
+
+      {errorEliminar && <p className="text-xs text-red-400 mb-3">{errorEliminar}</p>}
 
       <div className="flex flex-wrap gap-3 mb-5">
         <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)} className="bg-[#111] border border-white/10 rounded px-3 py-1.5 text-sm text-white/80 focus:outline-none cursor-pointer">
@@ -141,10 +144,16 @@ export default function AdminVentas() {
                           <button onClick={() => handleEdit(v)} className="p-1.5 rounded hover:bg-white/10 text-white/40 hover:text-white">
                             <Pencil size={14} />
                           </button>
-                          <button onClick={() => handleDelete(v.id)} disabled={eliminando === v.id}
-                            className="p-1.5 rounded hover:bg-red-500/20 text-white/40 hover:text-red-400 disabled:opacity-40">
-                            <Trash2 size={14} />
-                          </button>
+                          {puedeEliminarVenta(v) ? (
+                            <button onClick={() => handleDelete(v.id)} disabled={eliminando === v.id}
+                              className="p-1.5 rounded hover:bg-red-500/20 text-white/40 hover:text-red-400 disabled:opacity-40">
+                              <Trash2 size={14} />
+                            </button>
+                          ) : (
+                            <span title={MENSAJE_VENTA_DE_PEDIDO} className="p-1.5 text-white/15 cursor-not-allowed">
+                              <Trash2 size={14} />
+                            </span>
+                          )}
                         </div>
                       )}
                     </td>

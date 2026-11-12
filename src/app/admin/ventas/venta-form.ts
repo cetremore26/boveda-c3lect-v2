@@ -1,4 +1,5 @@
 import type { DatosVenta, Venta } from '../../api/ventas';
+import { hoyLocal } from '../../lib/format';
 
 // Estado, constantes y conversiones del formulario de ventas, sin React.
 
@@ -17,13 +18,30 @@ export const CATEGORIAS_FILTRO = [
   { value: 'accesorio', label: 'Accesorios' },
 ];
 
-export const EMPTY_FORM = {
-  fecha: new Date().toISOString().split('T')[0],
-  cliente: '', celular: '', marca: '', modelo: '', estilo: '',
-  precioVenta: '', costoProducto: '', costoEnvio: '0',
-  abono: '', fuente: '', estado: 'Pagado',
-};
-export type FormState = typeof EMPTY_FORM;
+export interface FormState {
+  fecha: string;
+  cliente: string;
+  celular: string;
+  marca: string;
+  modelo: string;
+  estilo: string;
+  precioVenta: string;
+  costoProducto: string;
+  costoEnvio: string;
+  abono: string;
+  fuente: string;
+  estado: string;
+}
+
+// Función y no constante: la fecha se calcula al crear o reiniciar el formulario.
+export function formVacio(): FormState {
+  return {
+    fecha: hoyLocal(),
+    cliente: '', celular: '', marca: '', modelo: '', estilo: '',
+    precioVenta: '', costoProducto: '', costoEnvio: '0',
+    abono: '', fuente: '', estado: 'Pagado',
+  };
+}
 
 // Sugerencia de estado mientras se llena el formulario. El backend tiene la
 // regla autoritativa (planVentaUpdate cierra en "Pagado" al completar el abono).
@@ -70,4 +88,12 @@ export function formDesdeVenta(v: Venta): FormState {
     fuente: v.fuente ?? '',
     estado: v.estado,
   };
+}
+
+export const MENSAJE_VENTA_DE_PEDIDO =
+  'Esta venta viene de un pedido de la plataforma: cancela el pedido en su lugar.';
+
+// El backend rechaza borrar ventas que vienen de un pedido.
+export function puedeEliminarVenta(v: Pick<Venta, 'orderId'>): boolean {
+  return !v.orderId;
 }

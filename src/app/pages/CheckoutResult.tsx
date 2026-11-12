@@ -1,56 +1,47 @@
+import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router';
 import { CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { Button } from '../components/ds/Button';
+import { useCart } from '../context/CartContext';
+import { borrarPendingCheckout, leerPendingCheckout } from '../lib/checkoutPendiente';
+import {
+  efectoDelResultado,
+  estadoDesdeRuta,
+  numeroDePedidoVisible,
+  TEXTOS_RESULTADO,
+} from '../lib/resultadoCheckout';
 
-type Status = 'success' | 'failure' | 'pending';
-
-const CONTENT: Record<Status, { icon: typeof CheckCircle2; color: string; title: string; body: string }> = {
-  success: {
-    icon: CheckCircle2,
-    color: '#C9A84C',
-    title: 'Pago aprobado',
-    body: 'Tu pago fue procesado correctamente. Te enviamos el comprobante a tu correo.',
-  },
-  failure: {
-    icon: XCircle,
-    color: '#C9A84C',
-    title: 'Pago rechazado',
-    body: 'No pudimos procesar tu pago. Tu pedido fue cancelado — puedes intentarlo de nuevo desde el carrito.',
-  },
-  pending: {
-    icon: Clock,
-    color: '#C9A84C',
-    title: 'Pago en proceso',
-    body: 'Tu pago está siendo revisado. Te notificaremos por correo en cuanto se confirme.',
-  },
-};
+const ICONOS = { success: CheckCircle2, failure: XCircle, pending: Clock };
 
 export default function CheckoutResult() {
   const location = useLocation();
-  const params = new URLSearchParams(location.search);
-  const orderNumber = params.get('external_reference');
+  const { clearCart } = useCart();
+  const estado = estadoDesdeRuta(location.pathname);
+  const orderNumber = numeroDePedidoVisible(estado, location.search);
+  const { titulo, cuerpo, cta } = TEXTOS_RESULTADO[estado];
+  const Icon = ICONOS[estado];
 
-  const status: Status = location.pathname.endsWith('success')
-    ? 'success'
-    : location.pathname.endsWith('failure')
-    ? 'failure'
-    : 'pending';
-
-  const { icon: Icon, color, title, body } = CONTENT[status];
+  useEffect(() => {
+    const efecto = efectoDelResultado(estado, leerPendingCheckout(localStorage));
+    if (efecto.vaciarCarrito) clearCart();
+    if (efecto.borrarPendiente) borrarPendingCheckout(localStorage);
+    // Solo al montar: el resultado depende de la ruta con la que se entra.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6 bg-[#0A0A0A]">
       <div className="w-full max-w-sm text-center">
-        <Icon size={40} className="mx-auto mb-6" style={{ color }} />
+        <Icon size={40} className="mx-auto mb-6" style={{ color: '#C9A84C' }} />
         <h1 className="text-3xl mb-4 text-white" style={{ fontFamily: 'var(--font-serif)', fontWeight: 300 }}>
-          {title}
+          {titulo}
         </h1>
         {orderNumber && (
           <p className="text-white/40 text-xs uppercase tracking-widest mb-3">Pedido #{orderNumber}</p>
         )}
-        <p className="text-white/60 text-sm leading-relaxed mb-10">{body}</p>
-        <Button as={Link} to="/catalog" variant="block-dark">
-          Seguir explorando
+        <p className="text-white/60 text-sm leading-relaxed mb-10">{cuerpo}</p>
+        <Button as={Link} to={cta.a} variant="block-dark">
+          {cta.texto}
         </Button>
       </div>
     </div>

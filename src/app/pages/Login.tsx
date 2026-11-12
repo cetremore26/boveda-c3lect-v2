@@ -5,12 +5,13 @@ import { useAuth } from '../context/AuthContext';
 import { Field } from '../components/ds/Field';
 import { FormError } from '../components/ds/FormError';
 import { Button } from '../components/ds/Button';
+import { mensajeDeError } from '../api/common';
 import { PARAM_VOLVER, destinoSeguro, rutaDeAcceso } from '../lib/volver';
 
-type Modo = 'password' | 'otp-request' | 'otp-verify';
+type Modo = 'password' | 'otp-request' | 'otp-verify' | 'segundo-factor';
 
 export default function Login() {
-  const { login, requestOtp, loginConOtp } = useAuth();
+  const { login, completarSegundoFactor, requestOtp, loginConOtp } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const destino = destinoSeguro(searchParams.get(PARAM_VOLVER));
@@ -20,6 +21,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [otpCode, setOtpCode] = useState('');
+  const [challengeToken, setChallengeToken] = useState('');
   const [error, setError] = useState('');
   const [enviando, setEnviando] = useState(false);
 
@@ -28,11 +30,48 @@ export default function Login() {
     setError('');
     setEnviando(true);
     try {
-      await login(email, password);
+      const { challengeToken: desafio } = await login(email, password);
+      if (desafio) {
+        setChallengeToken(desafio);
+        setOtpCode('');
+        setModo('segundo-factor');
+      } else {
+        navigate(destino, { replace: true });
+      }
+    } catch (err: unknown) {
+      setError(mensajeDeError(err, 'Error al iniciar sesión'));
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  async function handleSegundoFactor(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setEnviando(true);
+    try {
+      await completarSegundoFactor(challengeToken, otpCode);
       navigate(destino, { replace: true });
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setError(msg ?? 'Error al iniciar sesión');
+      setError(mensajeDeError(err, 'Código inválido o expirado'));
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  async function handleReenviarCodigo() {
+    setError('');
+    setEnviando(true);
+    try {
+      const { challengeToken: desafio } = await login(email, password);
+      if (desafio) {
+        setChallengeToken(desafio);
+        setOtpCode('');
+      } else {
+        navigate(destino, { replace: true });
+      }
+    } catch (err: unknown) {
+      setError(mensajeDeError(err, 'No se pudo reenviar el código'));
     } finally {
       setEnviando(false);
     }
@@ -59,13 +98,15 @@ export default function Login() {
     try {
       const result = await loginConOtp(email, otpCode);
       if (result?.requiresRegistration) {
-        navigate(rutaDeAcceso(destino, '/register'), { replace: true });
+        navigate(rutaDeAcceso(destino, '/register'), {
+          replace: true,
+          state: { email, registrationToken: result.registrationToken },
+        });
       } else {
         navigate(destino, { replace: true });
       }
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setError(msg ?? 'Código inválido o expirado');
+      setError(mensajeDeError(err, 'Código inválido o expirado'));
     } finally {
       setEnviando(false);
     }
@@ -74,6 +115,8 @@ export default function Login() {
   function cambiarModo(nuevo: Modo) {
     setModo(nuevo);
     setError('');
+    setOtpCode('');
+    setChallengeToken('');
   }
 
   return (
@@ -182,6 +225,38 @@ export default function Login() {
             <Button type="submit" disabled={enviando} variant="block-dark">
               {enviando ? 'Verificando…' : 'Verificar código'}
             </Button>
+          </form>
+        )}
+
+        {modo === 'segundo-factor' && (
+          <form onSubmit={handleSegundoFactor} className="space-y-7">
+            <p className="text-sm text-white/50">
+              Te enviamos un código a tu correo. Ingrésalo abajo.
+            </p>
+            <Field
+              label="Código OTP"
+              type="text"
+              required
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              className="text-center tracking-[0.5em] text-lg"
+              placeholder="000000"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+            />
+            <Button type="submit" disabled={enviando} variant="block-dark">
+              {enviando ? 'Verificando…' : 'Verificar código'}
+            </Button>
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={handleReenviarCodigo}
+                disabled={enviando}
+                className="text-xs uppercase tracking-widest text-white/40 hover:text-[#C9A84C] transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Reenviar código
+              </button>
+            </div>
           </form>
         )}
 

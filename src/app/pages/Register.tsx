@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { trackCompleteRegistration, setMetaUserData } from '../lib/metaPixel';
 import { Field } from '../components/ds/Field';
 import { FormError } from '../components/ds/FormError';
 import { Button } from '../components/ds/Button';
+import { mensajeDeError } from '../api/common';
+import { leerEstadoRegistro } from '../lib/autenticacion';
 import { PARAM_VOLVER, destinoSeguro, rutaDeAcceso } from '../lib/volver';
 
 interface Fuerza {
@@ -26,14 +28,21 @@ function calcFuerza(p: string): Fuerza {
   return { nivel: 3, label: 'Fuerte', color: '#22c55e' };
 }
 
+type Paso = 'email' | 'codigo' | 'formulario';
+
 export default function Register() {
-  const { register } = useAuth();
+  const { register, requestOtp, loginConOtp } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const destino = destinoSeguro(searchParams.get(PARAM_VOLVER));
 
   const [nombre, setNombre] = useState('');
-  const [email, setEmail] = useState('');
+  const previo = leerEstadoRegistro(location.state);
+  const [paso, setPaso] = useState<Paso>(previo ? 'formulario' : 'email');
+  const [email, setEmail] = useState(previo?.email ?? '');
+  const [registrationToken, setRegistrationToken] = useState(previo?.registrationToken ?? '');
+  const [codigo, setCodigo] = useState('');
   const [telefono, setTelefono] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -41,6 +50,49 @@ export default function Register() {
   const [enviando, setEnviando] = useState(false);
 
   const fuerza = calcFuerza(password);
+
+  async function handleEnviarCodigo(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setEnviando(true);
+    try {
+      await requestOtp(email);
+    } catch {
+      // mismo comportamiento siempre — no revelar si el email existe
+    } finally {
+      setEnviando(false);
+      setCodigo('');
+      setPaso('codigo');
+    }
+  }
+
+  async function handleVerificarCodigo(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setEnviando(true);
+    try {
+      const result = await loginConOtp(email, codigo);
+      if (result?.requiresRegistration) {
+        // Con la API vieja el token puede venir vacío.
+        setRegistrationToken(result.registrationToken ?? '');
+        setPaso('formulario');
+      } else {
+        // La cuenta ya existía y quedó con la sesión iniciada.
+        navigate(destino, { replace: true });
+      }
+    } catch (err: unknown) {
+      setError(mensajeDeError(err, 'Código inválido o expirado'));
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  function cambiarCorreo() {
+    setPaso('email');
+    setError('');
+    setCodigo('');
+    setRegistrationToken('');
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -53,7 +105,7 @@ export default function Register() {
 
     setEnviando(true);
     try {
-      await register(email, password, nombre, telefono || undefined);
+      await register(email, password, nombre, telefono || undefined, registrationToken || undefined);
 
       // CompleteRegistration: el evento al que optimiza la campaña de
       // lanzamiento. Va DESPUÉS del await para no contar registros fallidos.
@@ -67,8 +119,7 @@ export default function Register() {
 
       navigate(destino, { replace: true });
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setError(msg ?? 'Error al crear la cuenta');
+      setError(mensajeDeError(err, 'Error al crear la cuenta'));
     } finally {
       setEnviando(false);
     }
@@ -96,6 +147,58 @@ export default function Register() {
 
         {error && <div className="mb-6"><FormError>{error}</FormError></div>}
 
+        {paso === 'email' && (
+          <form onSubmit={handleEnviarCodigo} className="space-y-7">
+            <p className="text-sm text-white/50">
+              Primero verificamos tu correo: te enviaremos un código de 6 dígitos.
+            </p>
+            <Field
+              label="Correo electrónico"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="tu@correo.com"
+              autoComplete="email"
+            />
+            <Button type="submit" disabled={enviando} variant="block-dark">
+              {enviando ? 'Enviando…' : 'Enviar código'}
+            </Button>
+          </form>
+        )}
+
+        {paso === 'codigo' && (
+          <form onSubmit={handleVerificarCodigo} className="space-y-7">
+            <p className="text-sm text-white/50">
+              Se envió un código a <strong className="text-white/70">{email}</strong>. Ingrésalo abajo.
+            </p>
+            <Field
+              label="Código OTP"
+              type="text"
+              required
+              value={codigo}
+              onChange={(e) => setCodigo(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              className="text-center tracking-[0.5em] text-lg"
+              placeholder="000000"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+            />
+            <Button type="submit" disabled={enviando} variant="block-dark">
+              {enviando ? 'Verificando…' : 'Verificar código'}
+            </Button>
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={cambiarCorreo}
+                className="text-xs uppercase tracking-widest text-white/40 hover:text-[#C9A84C] transition-colors cursor-pointer"
+              >
+                Usar otro correo
+              </button>
+            </div>
+          </form>
+        )}
+
+        {paso === 'formulario' && (
         <form onSubmit={handleSubmit} className="space-y-7">
           <Field
             label="Nombre completo"
@@ -110,10 +213,8 @@ export default function Register() {
           <Field
             label="Correo electrónico"
             type="email"
-            required
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="tu@correo.com"
+            readOnly
             autoComplete="email"
           />
 
@@ -175,6 +276,7 @@ export default function Register() {
             {enviando ? 'Creando cuenta…' : 'Crear cuenta'}
           </Button>
         </form>
+        )}
 
         <p className="mt-8 text-center text-sm text-white/50">
           ¿Ya tienes cuenta?{' '}

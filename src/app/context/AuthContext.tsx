@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { authApi, type UsuarioSesion } from '../api/auth';
+import { borrarSesionGuardada, debeCerrarSesionAlArrancar, emitirSesionCerrada, escucharSesionCerrada } from '../lib/sesion';
+import { borrarCarritoGuardado } from '../lib/carrito';
 
 type AuthUser = UsuarioSesion;
 
@@ -8,9 +10,17 @@ interface AuthContextValue {
   accessToken: string | null;
   cargando: boolean;
   autenticado: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  loginConOtp: (email: string, code: string) => Promise<{ requiresRegistration?: boolean }>;
-  register: (email: string, password: string, nombre: string, telefono?: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ challengeToken?: string }>;
+  completarSegundoFactor: (challengeToken: string, code: string) => Promise<void>;
+  loginConOtp: (email: string, code: string) => Promise<{ requiresRegistration?: boolean; registrationToken?: string }>;
+  register: (
+    email: string,
+    password: string,
+    nombre: string,
+    telefono?: string,
+    registrationToken?: string,
+  ) => Promise<void>;
+  restablecerContrasena: (token: string, newPassword: string) => Promise<void>;
   logout: () => Promise<void>;
   requestOtp: (email: string) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
@@ -19,16 +29,13 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function saveSession(accessToken: string, refreshToken: string, user: AuthUser) {
+function saveSession(accessToken: string, refreshToken: string) {
   sessionStorage.setItem('accessToken', accessToken);
   sessionStorage.setItem('refreshToken', refreshToken);
-  sessionStorage.setItem('authUser', JSON.stringify(user));
 }
 
 function clearSession() {
-  sessionStorage.removeItem('accessToken');
-  sessionStorage.removeItem('refreshToken');
-  sessionStorage.removeItem('authUser');
+  borrarSesionGuardada();
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -48,26 +55,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data);
         setAccessToken(storedToken);
       })
-      .catch(() => {
-        // Fallback: leer usuario del sessionStorage si /auth/me no existe aún
-        const stored = sessionStorage.getItem('authUser');
-        if (stored) {
-          try {
-            setUser(JSON.parse(stored));
-            setAccessToken(storedToken);
-          } catch {
-            clearSession();
-          }
-        } else {
-          clearSession();
-        }
+      .catch((err) => {
+        if (debeCerrarSesionAlArrancar(err)) clearSession();
+        setUser(null);
       })
       .finally(() => setCargando(false));
   }, []);
 
+  useEffect(
+    () => escucharSesionCerrada((m) => {
+      if (m === 'expirada') {
+        setUser(null);
+        setAccessToken(null);
+      }
+    }),
+    [],
+  );
+
   async function login(email: string, password: string) {
     const data = await authApi.login(email, password);
-    saveSession(data.accessToken, data.refreshToken, data.user);
+    if ('accessToken' in data && data.accessToken) {
+      saveSession(data.accessToken, data.refreshToken);
+      setAccessToken(data.accessToken);
+      setUser(data.user);
+      return {};
+    }
+    if ('requiresSecondFactor' in data && data.requiresSecondFactor) {
+      return { challengeToken: data.challengeToken };
+    }
+    return {};
+  }
+
+  async function completarSegundoFactor(challengeToken: string, code: string) {
+    const data = await authApi.loginSegundoFactor(challengeToken, code);
+    saveSession(data.accessToken, data.refreshToken);
     setAccessToken(data.accessToken);
     setUser(data.user);
   }
@@ -75,16 +96,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function loginConOtp(email: string, code: string) {
     const data = await authApi.verificarOtp(email, code);
     if (data.accessToken && data.user) {
-      saveSession(data.accessToken, data.refreshToken!, data.user);
+      saveSession(data.accessToken, data.refreshToken!);
       setAccessToken(data.accessToken);
       setUser(data.user);
     }
-    return { requiresRegistration: data.requiresRegistration };
+    return { requiresRegistration: data.requiresRegistration, registrationToken: data.registrationToken };
   }
 
-  async function register(email: string, password: string, nombre: string, telefono?: string) {
-    const data = await authApi.registrar({ email, password, nombre, telefono });
-    saveSession(data.accessToken, data.refreshToken, data.user);
+  async function register(email: string, password: string, nombre: string, telefono?: string, registrationToken?: string) {
+    const data = await authApi.registrar({ email, password, nombre, telefono, registrationToken });
+    saveSession(data.accessToken, data.refreshToken);
     setAccessToken(data.accessToken);
     setUser(data.user);
   }
@@ -96,6 +117,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // ignorar error — el token puede estar expirado
     }
     clearSession();
+    // El carrito no debe pasar a la siguiente persona que use este navegador.
+    // Se borra del almacenamiento aquí (cubre /admin, donde CartProvider no
+    // está montado) y el evento vacía el carrito en memoria si lo está.
+    try {
+      borrarCarritoGuardado(localStorage);
+    } catch {
+      // localStorage no disponible: no hay carrito guardado que borrar.
+    }
+    emitirSesionCerrada('logout');
     setAccessToken(null);
     setUser(null);
   }
@@ -108,12 +138,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await authApi.solicitarRestablecimiento(email);
   }
 
+  async function restablecerContrasena(token: string, newPassword: string) {
+    await authApi.restablecerContrasena(token, newPassword);
+  }
+
   // Vuelve a leer /auth/me — se usa tras editar el perfil (nombre/teléfono)
   // para que el nombre en el nav y el resto de la app queden al día.
   async function refrescarUsuario() {
     const data = await authApi.yo();
     setUser(data);
-    sessionStorage.setItem('authUser', JSON.stringify(data));
   }
 
   return (
@@ -123,11 +156,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cargando,
       autenticado: !!user,
       login,
+      completarSegundoFactor,
       loginConOtp,
       register,
       logout,
       requestOtp,
       requestPasswordReset,
+      restablecerContrasena,
       refrescarUsuario,
     }}>
       {children}

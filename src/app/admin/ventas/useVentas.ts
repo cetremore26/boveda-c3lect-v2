@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { mensajeDeError } from '../../api/common';
 import { inventarioApi, type ItemInventario } from '../../api/inventario';
 import { marcasApi } from '../../api/marcas';
 import { metricsApi, type VentasPaginadas } from '../../api/metrics';
@@ -10,8 +11,8 @@ import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { exportCSV } from './exportar-csv';
 import {
   datosDesdeForm,
-  EMPTY_FORM,
   formDesdeVenta,
+  formVacio,
   type FormState,
 } from './venta-form';
 
@@ -27,15 +28,16 @@ export function useVentas() {
   const [desde, setDesde]       = useState('');
   const [hasta, setHasta]       = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm]         = useState<FormState>(EMPTY_FORM);
+  const [form, setForm]         = useState<FormState>(formVacio);
   const [guardando, setGuardando] = useState(false);
   const [exportando, setExportando] = useState(false);
   const [formError, setFormError] = useState('');
   const [resumen, setResumen] = useState({ totalVendido: 0, pendienteCobro: 0 });
   const [editId, setEditId]     = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<FormState>(EMPTY_FORM);
+  const [editForm, setEditForm] = useState<FormState>(formVacio);
   const [editError, setEditError] = useState('');
   const [eliminando, setEliminando] = useState<string | null>(null);
+  const [errorEliminar, setErrorEliminar] = useState('');
 
   const ventasQuery = useApiQuery<VentasPaginadas>(
     async (signal) => {
@@ -66,7 +68,8 @@ export function useVentas() {
   // Volver a página 1 cuando cambian los filtros — igual criterio que en AdminCompras.
   useEffect(() => { setPage(1); }, [filtroEstado, filtroFuente, filtroCategoria, desde, hasta]);
 
-  useRefetchOnFocus(useCallback(() => ventasQuery.refetch(), [ventasQuery.refetch]));
+  const refetchVentas = ventasQuery.refetch;
+  useRefetchOnFocus(useCallback(() => refetchVentas(), [refetchVentas]));
 
   const inventarioQuery = useApiQuery<ItemInventario[]>(async (signal) => {
     return inventarioApi.listar(signal);
@@ -108,11 +111,11 @@ export function useVentas() {
     try {
       await ventasApi.crear(datosDesdeForm(form));
       setShowForm(false);
-      setForm(EMPTY_FORM);
+      setForm(formVacio());
       setPage(1);
       ventasQuery.refetch();
-    } catch (err: any) {
-      setFormError(err?.response?.data?.message ?? 'Error al guardar la venta');
+    } catch (err) {
+      setFormError(mensajeDeError(err, 'Error al guardar la venta'));
     } finally { setGuardando(false); }
   };
 
@@ -131,17 +134,20 @@ export function useVentas() {
       await ventasApi.actualizar(editId, datosDesdeForm(editForm));
       setEditId(null);
       ventasQuery.refetch();
-    } catch (err: any) {
-      setEditError(err?.response?.data?.message ?? 'Error al guardar');
+    } catch (err) {
+      setEditError(mensajeDeError(err, 'Error al guardar'));
     } finally { setGuardando(false); }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Eliminar esta venta? Se revertirá el descuento de inventario.')) return;
     setEliminando(id);
+    setErrorEliminar('');
     try {
       await ventasApi.eliminar(id);
       ventasQuery.refetch();
+    } catch (err) {
+      setErrorEliminar(mensajeDeError(err, 'No se pudo eliminar la venta'));
     } finally { setEliminando(null); }
   };
 
@@ -153,6 +159,6 @@ export function useVentas() {
     showForm, setShowForm, form, setForm, formError, handleSubmit,
     editId, setEditId, editForm, setEditForm, editError, setEditError,
     handleEdit, handleEditSave,
-    guardando, exportando, handleExport, eliminando, handleDelete,
+    guardando, exportando, handleExport, eliminando, handleDelete, errorEliminar,
   };
 }

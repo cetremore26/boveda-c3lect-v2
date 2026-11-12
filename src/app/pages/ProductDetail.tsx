@@ -68,7 +68,7 @@ export default function ProductDetail() {
 
   function handleAddToCart() {
     if (!producto) return;
-    addItem(producto);
+    if (!addItem(producto)) return;
     trackAddToCart({
       id: producto.id,
       display: producto.display,

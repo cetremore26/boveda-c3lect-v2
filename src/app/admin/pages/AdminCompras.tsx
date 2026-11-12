@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Pencil, Plus, X } from 'lucide-react';
 import { comprasApi, type Compra } from '../../api/compras';
-import type { Paginado } from '../../api/common';
+import { mensajeDeError, type Paginado } from '../../api/common';
 import { inventarioApi, type ItemInventario } from '../../api/inventario';
 import { marcasApi } from '../../api/marcas';
 import { metricsApi, type Financiero } from '../../api/metrics';
-import { formatPrecio as COP, formatFecha as fmtFecha } from '../../lib/format';
+import { formatPrecio as COP, formatFecha as fmtFecha, hoyLocal } from '../../lib/format';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { useMarcaModeloToggle, NUEVA_MARCA, NUEVO_MODELO } from '../../hooks/useMarcaModeloToggle';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
@@ -13,11 +13,13 @@ import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 const CATEGORIAS = ['Reloj', 'Perfume', 'Accesorio'];
 
 
-const EMPTY_FORM = {
-  fecha: new Date().toISOString().split('T')[0],
-  marca: '', modelo: '', cantidad: '1', costoUnitario: '', categoria: 'Reloj',
-};
-type FormState = typeof EMPTY_FORM;
+function formVacio() {
+  return {
+    fecha: hoyLocal(),
+    marca: '', modelo: '', cantidad: '1', costoUnitario: '', categoria: 'Reloj',
+  };
+}
+type FormState = ReturnType<typeof formVacio>;
 
 const inp = 'bg-[#0A0A0A] border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C9A84C]/60 w-full';
 const sel = inp + ' cursor-pointer';
@@ -133,11 +135,11 @@ export default function AdminCompras() {
   const [desde, setDesde]       = useState('');
   const [hasta, setHasta]       = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm]         = useState<FormState>(EMPTY_FORM);
+  const [form, setForm]         = useState<FormState>(formVacio);
   const [guardando, setGuardando] = useState(false);
   const [formError, setFormError] = useState('');
   const [editId, setEditId]     = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<FormState>(EMPTY_FORM);
+  const [editForm, setEditForm] = useState<FormState>(formVacio);
   const [editError, setEditError] = useState('');
 
   const comprasQuery = useApiQuery<Paginado<Compra>>(
@@ -173,10 +175,12 @@ export default function AdminCompras() {
   }, []);
   const resumen = resumenQuery.data ?? null;
 
+  const refetchCompras = comprasQuery.refetch;
+  const refetchResumen = resumenQuery.refetch;
   useRefetchOnFocus(useCallback(() => {
-    comprasQuery.refetch();
-    resumenQuery.refetch();
-  }, [comprasQuery.refetch, resumenQuery.refetch]));
+    refetchCompras();
+    refetchResumen();
+  }, [refetchCompras, refetchResumen]));
 
   const marcasQuery = useApiQuery<string[]>(async (signal) => {
     return marcasApi.listar(signal);
@@ -186,7 +190,8 @@ export default function AdminCompras() {
   const inventarioQuery = useApiQuery<ItemInventario[]>(async (signal) => {
     return inventarioApi.listar(signal);
   }, []);
-  const inventarioItems = inventarioQuery.data ?? [];
+  const inventarioData = inventarioQuery.data;
+  const inventarioItems = useMemo(() => inventarioData ?? [], [inventarioData]);
 
   const errorOpciones = !!marcasQuery.error || !!inventarioQuery.error;
 
@@ -218,12 +223,12 @@ export default function AdminCompras() {
         categoria: form.categoria,
       });
       setShowForm(false);
-      setForm(EMPTY_FORM);
+      setForm(formVacio());
       setPage(1);
       comprasQuery.refetch();
       resumenQuery.refetch();
-    } catch (err: any) {
-      setFormError(err?.response?.data?.message ?? 'Error al guardar la compra');
+    } catch (err) {
+      setFormError(mensajeDeError(err, 'Error al guardar la compra'));
     } finally { setGuardando(false); }
   };
 
@@ -258,8 +263,8 @@ export default function AdminCompras() {
       setEditId(null);
       comprasQuery.refetch();
       resumenQuery.refetch();
-    } catch (err: any) {
-      setEditError(err?.response?.data?.message ?? 'Error al guardar');
+    } catch (err) {
+      setEditError(mensajeDeError(err, 'Error al guardar'));
     } finally { setGuardando(false); }
   };
 
@@ -272,7 +277,7 @@ export default function AdminCompras() {
           <h1 className="text-2xl font-semibold text-white mb-1">Compras de Inventario</h1>
           <p className="text-sm text-white/40">{meta.total} registros</p>
         </div>
-        <button onClick={() => { setShowForm(!showForm); setEditId(null); }}
+        <button onClick={() => { if (!showForm) setForm(formVacio()); setShowForm(!showForm); setEditId(null); }}
           className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium"
           style={{ background: 'rgba(201,168,76,0.15)', color: '#C9A84C', border: '1px solid rgba(201,168,76,0.3)' }}>
           {showForm ? <X size={15} /> : <Plus size={15} />}

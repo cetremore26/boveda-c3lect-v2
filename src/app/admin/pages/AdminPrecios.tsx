@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Pencil, Check, X } from 'lucide-react';
 import { preciosApi, type Precio } from '../../api/precios';
+import { mensajeDeError } from '../../api/common';
 import { inventarioApi, type ItemInventario } from '../../api/inventario';
 import { marcasApi } from '../../api/marcas';
 import { formatPrecio as COP } from '../../lib/format';
@@ -104,8 +105,8 @@ export default function AdminPrecios() {
       setModoMarcaNueva(false);
       setModoModeloNuevo(false);
       preciosQuery.refetch();
-    } catch (err: any) {
-      setFormError(err?.response?.data?.message ?? 'Error al guardar');
+    } catch (err) {
+      setFormError(mensajeDeError(err, 'Error al guardar'));
     } finally { setGuardando(false); }
   };
 
@@ -133,8 +134,8 @@ export default function AdminPrecios() {
       });
       setEditId(null);
       preciosQuery.refetch();
-    } catch (err: any) {
-      setEditError(err?.response?.data?.message ?? 'Error al guardar');
+    } catch (err) {
+      setEditError(mensajeDeError(err, 'Error al guardar'));
     } finally { setGuardando(false); }
   };
 

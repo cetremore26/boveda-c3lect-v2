@@ -26,12 +26,17 @@ export function useResenas() {
  */
 export function usePendientesDeResena(autenticado: boolean) {
   const query = useApiQuery(
-    (signal) => (autenticado ? resenasApi.pendientes(signal) : Promise.resolve([])),
+    async (signal) => ({
+      conSesion: autenticado,
+      items: autenticado ? await resenasApi.pendientes(signal) : [],
+    }),
     [autenticado],
   );
   const ids = useMemo(
-    () => new Set((query.data ?? []).map((p) => p.productId)),
+    () => new Set((query.data?.items ?? []).map((p) => p.productId)),
     [query.data],
   );
-  return { ...query, ids };
+  /** Con qué estado de sesión se hizo la consulta cuyos datos se exponen. */
+  const consultadoConSesion = query.data?.conSesion ?? null;
+  return { ...query, ids, consultadoConSesion };
 }

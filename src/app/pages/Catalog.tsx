@@ -645,7 +645,7 @@ function TarjetaProducto({ producto, index }: { producto: Producto; index: numbe
     e.preventDefault();
     e.stopPropagation();
     if (!producto.disponible) return;
-    addItem(producto);
+    if (!addItem(producto)) return;
     setAñadido(true);
     setTimeout(() => setAñadido(false), 1500);
   }

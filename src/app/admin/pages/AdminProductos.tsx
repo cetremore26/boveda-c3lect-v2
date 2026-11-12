@@ -7,13 +7,15 @@ import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent,
 } from '@dnd-kit/core';
 import {
-  SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
+  SortableContext, verticalListSortingStrategy, useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { productsApi, type ProductoAdmin } from '../../api/products';
 import { formatPrecio as COP } from '../../lib/format';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
+import { mensajeDeError } from '../../api/common';
+import { moverEnOrden, cambiosDeOrden } from '../productos/orden-destacados';
 
 
 
@@ -29,6 +31,8 @@ export default function AdminProductos() {
   const [ordenIds, setOrdenIds] = useState<string[]>([]);
   const [guardandoOrden, setGuardandoOrden] = useState(false);
   const [ordenGuardado, setOrdenGuardado] = useState(false);
+  const [errorAccion, setErrorAccion] = useState('');
+  const [errorEliminar, setErrorEliminar] = useState('');
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const LIMIT = 20;
@@ -110,8 +114,12 @@ export default function AdminProductos() {
   }, [destacado, productos]);
 
   async function toggleDisponible(id: string, current: boolean) {
-    await productsApi.actualizar(id, { disponible: !current });
-    setProductos((prev) => prev.map((p) => p.id === id ? { ...p, disponible: !current } : p));
+    try {
+      await productsApi.actualizar(id, { disponible: !current });
+      setProductos((prev) => prev.map((p) => p.id === id ? { ...p, disponible: !current } : p));
+    } catch (err) {
+      setErrorAccion(mensajeDeError(err, 'No se pudo cambiar la disponibilidad.'));
+    }
   }
 
   // Optimista: se actualiza la fila al instante y el PATCH corre en segundo
@@ -130,19 +138,25 @@ export default function AdminProductos() {
     const payload = current ? { destacado: false, destacadoOrden: null } : { destacado: true };
     productsApi.actualizar(id, payload)
       .then(() => destacadosQuery.refetch())
-      .catch(() => setProductos((prev) => prev.map((p) => p.id === id ? anterior : p)));
+      .catch(() => {
+        setProductos((prev) => prev.map((p) => p.id === id ? anterior : p));
+        setErrorAccion('No se pudo actualizar el destacado.');
+      });
   }
 
   async function eliminar(id: string) {
-    await productsApi.eliminar(id);
-    setConfirmDelete(null);
-    productosQuery.refetch();
+    try {
+      await productsApi.eliminar(id);
+      setConfirmDelete(null);
+      setErrorEliminar('');
+      productosQuery.refetch();
+    } catch (err) {
+      setErrorEliminar(mensajeDeError(err, 'No se pudo eliminar el producto.'));
+    }
   }
 
-  async function persistirOrden(idsEnOrden: string[]) {
-    const cambios = idsEnOrden
-      .map((id, i) => ({ id, destacadoOrden: i + 1 }))
-      .filter(({ id, destacadoOrden }) => productos.find((p) => p.id === id)?.destacadoOrden !== destacadoOrden);
+  async function persistirOrden(idsEnOrden: string[], anterior: string[]) {
+    const cambios = cambiosDeOrden(idsEnOrden, productos);
 
     if (cambios.length === 0) return;
 
@@ -156,6 +170,10 @@ export default function AdminProductos() {
       }));
       setOrdenGuardado(true);
       setTimeout(() => setOrdenGuardado(false), 1800);
+    } catch {
+      setOrdenIds(anterior);
+      productosQuery.refetch();
+      setErrorAccion('No se pudo guardar el orden de destacados. Se recargó la lista.');
     } finally {
       setGuardandoOrden(false);
     }
@@ -163,14 +181,11 @@ export default function AdminProductos() {
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    setOrdenIds((prev) => {
-      const oldIndex = prev.indexOf(String(active.id));
-      const newIndex = prev.indexOf(String(over.id));
-      const next = arrayMove(prev, oldIndex, newIndex);
-      void persistirOrden(next);
-      return next;
-    });
+    if (guardandoOrden || !over || active.id === over.id) return;
+    const anterior = ordenIds;
+    const next = moverEnOrden(ordenIds, String(active.id), String(over.id));
+    setOrdenIds(next);
+    void persistirOrden(next, anterior);
   }
 
   const productosVisibles = destacado
@@ -304,6 +319,13 @@ export default function AdminProductos() {
         )}
       </div>
 
+      {errorAccion && (
+        <div role="alert" className="flex items-center justify-between gap-3 mb-4 px-4 py-3 rounded text-sm text-red-400 bg-red-500/10">
+          <span>{errorAccion}</span>
+          <button onClick={() => setErrorAccion('')} className="text-xs underline">Cerrar</button>
+        </div>
+      )}
+
       {/* Tabla */}
       <div className="rounded-lg border overflow-hidden" style={{ background: '#161616', borderColor: 'rgba(255,255,255,0.08)' }}>
         {cargando ? (
@@ -342,7 +364,7 @@ export default function AdminProductos() {
                           onEditar={() => navigate(`/admin/productos/${p.id}`, { state: { from: `${location.pathname}${location.search}` } })}
                           onToggleDisponible={() => toggleDisponible(p.id, p.disponible)}
                           onToggleDestacado={() => toggleDestacado(p.id, p.destacado)}
-                          onEliminar={() => setConfirmDelete(p.id)}
+                          onEliminar={() => { setErrorEliminar(''); setConfirmDelete(p.id); }}
                         />
                       ))}
                     </tbody>
@@ -362,7 +384,7 @@ export default function AdminProductos() {
                       onEditar={() => navigate(`/admin/productos/${p.id}`, { state: { from: `${location.pathname}${location.search}` } })}
                       onToggleDisponible={() => toggleDisponible(p.id, p.disponible)}
                       onToggleDestacado={() => toggleDestacado(p.id, p.destacado)}
-                      onEliminar={() => setConfirmDelete(p.id)}
+                      onEliminar={() => { setErrorEliminar(''); setConfirmDelete(p.id); }}
                     />
                   ))}
                 </tbody>
@@ -405,9 +427,12 @@ export default function AdminProductos() {
             <p className="text-sm text-white/50 mb-5">
               ¿Confirmas que deseas eliminar el producto <span className="text-white">{confirmDelete}</span>? Esta acción no se puede deshacer.
             </p>
+            {errorEliminar && (
+              <p role="alert" className="text-sm text-red-400 bg-red-500/10 rounded px-3 py-2 mb-4">{errorEliminar}</p>
+            )}
             <div className="flex gap-3 justify-end">
               <button
-                onClick={() => setConfirmDelete(null)}
+                onClick={() => { setErrorEliminar(''); setConfirmDelete(null); }}
                 className="px-4 py-2 text-sm text-white/60 hover:text-white transition-colors"
               >
                 Cancelar
